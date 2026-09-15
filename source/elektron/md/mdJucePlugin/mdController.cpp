@@ -7,6 +7,7 @@
 #include "mdLib/mdsysexautomation.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <chrono>
 #include <set>
 
@@ -867,8 +868,11 @@ namespace mdJucePlugin
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
 				if(m_patternDumpPending.exchange(false, std::memory_order_acq_rel))
+				{
+					std::fprintf(stderr, "[MD] pattern status %u, requesting dump\n", status->value);
 					sendSynchronizationRequest(toPluginSysex(
 						md::patternDump::request(status->value)));
+				}
 				return true;
 			}
 		}
@@ -891,6 +895,8 @@ namespace mdJucePlugin
 			&& _message[6] == md::patternDump::g_patternDump)
 		{
 			const std::vector<uint8_t> dump(_message.begin(), _message.end());
+			std::fprintf(stderr, "[MD] pattern dump received: %zu bytes, valid=%d\n",
+				dump.size(), md::patternDump::isPatternDump(dump));
 			if(md::patternDump::isPatternDump(dump))
 			{
 				std::function<void(const std::vector<uint8_t>&)> listener;

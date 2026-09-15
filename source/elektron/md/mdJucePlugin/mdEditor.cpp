@@ -1153,7 +1153,7 @@ namespace mdJucePlugin
 
 	void Editor::servicePendingRandomize(const double _nowMilliseconds)
 	{
-		if(!m_pendingRandomize || _nowMilliseconds - m_pendingRandomize->startedMilliseconds < 3000.0)
+		if(!m_pendingRandomize || _nowMilliseconds - m_pendingRandomize->startedMilliseconds < 10000.0)
 			return;
 		m_pendingRandomize.reset();
 		showRandomizeMessage("The machine did not answer the pattern request. Make sure it has finished booting and is not in a menu.");
