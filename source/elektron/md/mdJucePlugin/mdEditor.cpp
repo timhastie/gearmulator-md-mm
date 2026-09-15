@@ -652,7 +652,7 @@ namespace mdJucePlugin
 				return randomizePageParameters();
 			if(functionHeld)
 				return beginPatternRandomize(_control == md::PanelControl::Up
-					? RandomizeKind::Trigs : RandomizeKind::PageLocks, std::nullopt);
+					? RandomizeKind::PageLocks : RandomizeKind::Trigs, std::nullopt);
 		}
 
 		// A missing native key-up must never let an earlier hold leak into a new,
@@ -1964,26 +1964,33 @@ namespace mdJucePlugin
 		if(const auto packet = md::panelEncoderPressPacket(getModel(), _encoder))
 		{
 			_knob->SetAttribute("speedScaleAlt", 1.0f);
-			_knob->SetAttribute("title", "Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn; Cmd/Ctrl-click to random-lock this parameter on every trig");
+			_knob->SetAttribute("title", "Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn; hold UP and click for random locks on every trig; FUNCTION + A snaps PTCH locks to the scale");
 			juceRmlUi::EventListener::Add(_knob, Rml::EventId::Mousedown,
 				[this, _knob, packet, _encoder](Rml::Event& _event)
 				{
-					if(juceRmlUi::helper::getKeyModCommand(_event)
-						&& getModel() == md::MachineModel::Machinedrum
+					// Randomize chords on encoders (Machinedrum): UP held + click =
+					// random locks for this parameter; FUNCTION held + click on A (PTCH)
+					// = snap the track's PTCH locks to the scale.
+					if(getModel() == md::MachineModel::Machinedrum
 						&& static_cast<uint8_t>(_encoder) < 8
-						&& juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left)
+						&& juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left
+						&& !juceRmlUi::helper::getKeyModAlt(_event))
 					{
-						if(juceRmlUi::helper::getKeyModShift(_event))
+						if(isPanelControlHeld(md::PanelControl::Up))
+						{
+							beginPatternRandomize(RandomizeKind::ParamLocks, static_cast<uint8_t>(_encoder));
+							_event.StopPropagation();
+							return;
+						}
+						if(isPanelControlHeld(md::PanelControl::Function))
 						{
 							if(_encoder == md::PanelEncoder::DataEntryA)
 								beginPatternRandomize(RandomizeKind::QuantizeLocks, 0);
 							else
-								showRandomizeMessage("Shift+Cmd-click encoder A (PTCH) to quantize its locks to the scale.");
+								showRandomizeMessage("FUNCTION + encoder A (PTCH) snaps the track's PTCH locks to the scale.");
+							_event.StopPropagation();
+							return;
 						}
-						else
-							beginPatternRandomize(RandomizeKind::ParamLocks, static_cast<uint8_t>(_encoder));
-						_event.StopPropagation();
-						return;
 					}
 					releaseEncoderPress();
 					if(m_encoderPress.begin(packet,
