@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <memory>
 #include <optional>
+#include <random>
 #include <vector>
 
 #include "jucePluginEditorLib/pluginEditor.h"
@@ -125,6 +126,17 @@ namespace mdJucePlugin
 		void servicePanelQueue();
 		void servicePanelNavigation();
 		void selectMachinedrumTrack(int _track);
+		// Randomize gestures (Machinedrum only). Pattern edits round-trip the
+		// current pattern through a SysEx dump so the firmware owns the result.
+		enum class RandomizeKind { Trigs, PageLocks, ParamLocks };
+		void beginPatternRandomize(RandomizeKind _kind, std::optional<uint8_t> _param);
+		void onPatternDumpReceived(std::vector<uint8_t> _dump);
+		void randomizePageParameters();
+		void servicePendingRandomize(double _nowMilliseconds);
+		std::optional<uint8_t> selectedMachinedrumTrack() const;
+		std::optional<uint8_t> activeMachinedrumPage() const;
+		bool isPanelControlHeld(md::PanelControl _control) const;
+		static void showRandomizeMessage(const std::string& _message);
 		void selectMachinedrumDataPage(int _page);
 		void selectMonomachineDataPage(int _page);
 		void selectMonomachineTrigMode(int _mode);
@@ -260,6 +272,16 @@ namespace mdJucePlugin
 		size_t m_sysexReceivePromptStep = 0;
 		double m_sysexLastAdvanceMilliseconds = 0.0;
 		bool m_sysexStallWarningShown = false;
+		struct PendingRandomize
+		{
+			RandomizeKind kind;
+			uint8_t track;
+			uint8_t page;
+			uint8_t param;
+			double startedMilliseconds;
+		};
+		std::optional<PendingRandomize> m_pendingRandomize;
+		std::mt19937 m_random{std::random_device{}()};
 		std::shared_ptr<void> m_lifetimeToken = std::make_shared<int>(0);
 	};
 }

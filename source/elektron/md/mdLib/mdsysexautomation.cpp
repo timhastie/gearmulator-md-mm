@@ -163,6 +163,8 @@ namespace md::automation::sysex
 		case g_kitRequest:
 			return _message[7]
 				< (_model == MachineModel::Monomachine ? 128 : 64);
+		case 0x68: // Machinedrum pattern request
+			return _model == MachineModel::Machinedrum && _message[7] < 128;
 		case g_statusRequest:
 			return _message[7] == static_cast<uint8_t>(StatusParameter::Global)
 					|| _message[7] == static_cast<uint8_t>(StatusParameter::Kit)

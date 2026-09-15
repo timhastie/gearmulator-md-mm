@@ -18,6 +18,7 @@
 #include "mdLib/mdfrontpanel.h"
 #include "mdLib/mdmidiprotocol.h"
 #include "mdLib/mdpanel.h"
+#include "mdLib/mdpatterndump.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdstate.h"
 
@@ -38,6 +39,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <functional>
 #include <string>
 #include <vector>
@@ -147,6 +149,7 @@ namespace mdJucePlugin
 
 	Editor::~Editor()
 	{
+		m_controller.setPatternDumpListener({});
 		juce::Desktop::getInstance().removeFocusChangeListener(this);
 		m_panelSteps.clear();
 		cancelPanelInputGestures();
@@ -593,6 +596,37 @@ namespace mdJucePlugin
 			juceRmlUi::EventListener::Add(document, Rml::EventId::Keydown,
 				[this](Rml::Event& _event)
 				{
+					// Randomize gestures. Keyboard arrows never reach the panel, so
+					// these cannot collide with a firmware key combination.
+					if(getModel() != md::MachineModel::Machinedrum)
+						return;
+					const auto key = juceRmlUi::helper::getKeyIdentifier(_event);
+					if(key != Rml::Input::KI_UP && key != Rml::Input::KI_DOWN)
+						return;
+					const auto shift = juceRmlUi::helper::getKeyModShift(_event);
+					if(key == Rml::Input::KI_UP && isPanelControlHeld(md::PanelControl::Enter))
+						randomizePageParameters();
+					else if(key == Rml::Input::KI_UP && shift)
+						beginPatternRandomize(RandomizeKind::Trigs, std::nullopt);
+					else if(key == Rml::Input::KI_DOWN && shift)
+						beginPatternRandomize(RandomizeKind::PageLocks, std::nullopt);
+					else
+						return;
+					_event.StopPropagation();
+				});
+			m_controller.setPatternDumpListener(
+				[this, token = std::weak_ptr<void>(m_lifetimeToken)](const std::vector<uint8_t>& _dump)
+				{
+					juce::MessageManager::callAsync([this, token, dump = _dump]() mutable
+					{
+						if(token.expired())
+							return;
+						onPatternDumpReceived(std::move(dump));
+					});
+				});
+			juceRmlUi::EventListener::Add(document, Rml::EventId::Keydown,
+				[this](Rml::Event& _event)
+				{
 					if(juceRmlUi::helper::getKeyIdentifier(_event) != Rml::Input::KI_ESCAPE
 						|| (m_shiftPanelLatch.empty() && m_activePanelButtons.empty()
 							&& m_panelGesturePackets.empty() && !m_patternBankPacket
@@ -1032,6 +1066,159 @@ namespace mdJucePlugin
 		event.sysex.insert(event.sysex.end(), body.begin(), body.end());
 		event.sysex.push_back(0xf7);
 		getProcessor().addMidiEvent(event);
+	}
+
+	void Editor::showRandomizeMessage(const std::string& _message)
+	{
+		std::fprintf(stderr, "[MD] randomize: %s\n", _message.c_str());
+		genericUI::MessageBox::showOk(genericUI::MessageBox::Icon::Warning,
+			"Randomize", _message);
+	}
+
+	bool Editor::isPanelControlHeld(const md::PanelControl _control) const
+	{
+		const auto packet = md::panelPacket(getModel(), _control);
+		if(!packet)
+			return false;
+		return std::any_of(m_activePanelButtons.begin(), m_activePanelButtons.end(),
+			[&packet](const ActivePanelButton& _b) { return _b.packet == *packet; });
+	}
+
+	std::optional<uint8_t> Editor::selectedMachinedrumTrack() const
+	{
+		if(!m_frontPanelSnapshotValid)
+			return std::nullopt;
+		for(uint32_t i = 0; i < 16; ++i)
+			if(m_frontPanelSnapshot.getDrumLed(i))
+				return static_cast<uint8_t>(i);
+		return std::nullopt;
+	}
+
+	std::optional<uint8_t> Editor::activeMachinedrumPage() const
+	{
+		if(!m_frontPanelSnapshotValid)
+			return std::nullopt;
+		constexpr md::FrontPanel::StatusLed pages[] =
+		{
+			md::FrontPanel::StatusLed::Synthesis,
+			md::FrontPanel::StatusLed::Effects,
+			md::FrontPanel::StatusLed::Routing,
+		};
+		std::optional<uint8_t> active;
+		for(uint8_t page = 0; page < 3; ++page)
+		{
+			if(!m_frontPanelSnapshot.getStatusLed(pages[page]))
+				continue;
+			if(active)
+				return std::nullopt;
+			active = page;
+		}
+		return active;
+	}
+
+	void Editor::randomizePageParameters()
+	{
+		const auto track = selectedMachinedrumTrack();
+		const auto page = activeMachinedrumPage();
+		if(!track)
+			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
+		if(!page)
+			return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
+		std::uniform_int_distribution<int> value(0, 127);
+		for(uint8_t index = 0; index < 8; ++index)
+		{
+			const auto& parameters = m_controller.findTrackParameters(*track, *page, index);
+			for(auto* const parameter : parameters)
+				parameter->setUnnormalizedValueNotifyingHost(value(m_random),
+					pluginLib::Parameter::Origin::Ui);
+		}
+	}
+
+	void Editor::beginPatternRandomize(const RandomizeKind _kind, const std::optional<uint8_t> _param)
+	{
+		if(m_pendingRandomize)
+			return;
+		const auto track = selectedMachinedrumTrack();
+		if(!track)
+			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
+		uint8_t page = 0;
+		if(_kind != RandomizeKind::Trigs)
+		{
+			const auto active = activeMachinedrumPage();
+			if(!active)
+				return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
+			page = *active;
+		}
+		m_pendingRandomize = PendingRandomize{_kind, *track, page, _param.value_or(0),
+			juce::Time::getMillisecondCounterHiRes()};
+		m_controller.requestCurrentPatternDump();
+	}
+
+	void Editor::servicePendingRandomize(const double _nowMilliseconds)
+	{
+		if(!m_pendingRandomize || _nowMilliseconds - m_pendingRandomize->startedMilliseconds < 3000.0)
+			return;
+		m_pendingRandomize.reset();
+		showRandomizeMessage("The machine did not answer the pattern request. Make sure it has finished booting and is not in a menu.");
+	}
+
+	void Editor::onPatternDumpReceived(std::vector<uint8_t> _dump)
+	{
+		if(!m_pendingRandomize)
+			return;
+		const auto pending = *m_pendingRandomize;
+		m_pendingRandomize.reset();
+
+		std::string error;
+		auto pattern = md::patternDump::decode(_dump, &error);
+		std::fprintf(stderr, "[MD] randomize: pattern dump version 0x%02x, %zu bytes, %s\n",
+			_dump.size() > 7 ? _dump[7] : 0, _dump.size(), pattern ? "decoded" : error.c_str());
+		if(!pattern)
+			return showRandomizeMessage("Could not decode the pattern dump: " + error);
+
+		const auto steps = pattern->stepCount();
+		const auto track = pending.track;
+		const uint64_t stepMask = steps >= 64 ? ~0ull : (1ull << steps) - 1;
+		std::uniform_int_distribution<int> value(0, 127);
+
+		if(pending.kind == RandomizeKind::Trigs)
+		{
+			std::uniform_real_distribution<float> densityRange(0.3f, 0.7f);
+			std::bernoulli_distribution hit(densityRange(m_random));
+			uint64_t trigs = 0;
+			for(size_t step = 0; step < steps; ++step)
+				if(hit(m_random))
+					trigs |= 1ull << step;
+			if(trigs == 0)
+				trigs = 1ull << std::uniform_int_distribution<size_t>(0, steps - 1)(m_random);
+			pattern->trigs[track] = trigs;
+		}
+		else
+		{
+			const auto trigs = pattern->trigs[track] & stepMask;
+			if(trigs == 0)
+				return showRandomizeMessage("The selected track has no trigs to lock.");
+			const uint8_t first = pending.kind == RandomizeKind::ParamLocks
+				? static_cast<uint8_t>(pending.page * 8 + pending.param)
+				: static_cast<uint8_t>(pending.page * 8);
+			const uint8_t count = pending.kind == RandomizeKind::ParamLocks ? 1 : 8;
+			for(uint8_t param = first; param < first + count; ++param)
+			{
+				for(size_t step = 0; step < steps; ++step)
+				{
+					if(!(trigs >> step & 1u))
+						continue;
+					if(!pattern->setLock(track, param, static_cast<uint8_t>(step),
+						static_cast<uint8_t>(value(m_random))))
+						return showRandomizeMessage("This pattern already uses the maximum of 64 parameter-lock rows.");
+				}
+			}
+		}
+
+		const auto encoded = md::patternDump::encode(*pattern);
+		std::fprintf(stderr, "[MD] randomize: sending pattern %u (%zu bytes, %zu lock rows)\n",
+			pattern->position, encoded.size(), pattern->rows.size());
+		m_controller.sendSysexToDevice(encoded);
 	}
 
 	void Editor::selectMachinedrumDataPage(const int _page)
@@ -1769,10 +1956,19 @@ namespace mdJucePlugin
 		if(const auto packet = md::panelEncoderPressPacket(getModel(), _encoder))
 		{
 			_knob->SetAttribute("speedScaleAlt", 1.0f);
-			_knob->SetAttribute("title", "Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn");
+			_knob->SetAttribute("title", "Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn; Cmd/Ctrl-click to random-lock this parameter on every trig");
 			juceRmlUi::EventListener::Add(_knob, Rml::EventId::Mousedown,
-				[this, _knob, packet](Rml::Event& _event)
+				[this, _knob, packet, _encoder](Rml::Event& _event)
 				{
+					if(juceRmlUi::helper::getKeyModCommand(_event)
+						&& getModel() == md::MachineModel::Machinedrum
+						&& static_cast<uint8_t>(_encoder) < 8
+						&& juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left)
+					{
+						beginPatternRandomize(RandomizeKind::ParamLocks, static_cast<uint8_t>(_encoder));
+						_event.StopPropagation();
+						return;
+					}
 					releaseEncoderPress();
 					if(m_encoderPress.begin(packet,
 						juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left
@@ -2056,6 +2252,7 @@ namespace mdJucePlugin
 			return;
 
 		const auto nowMilliseconds = juce::Time::getMillisecondCounterHiRes();
+		servicePendingRandomize(nowMilliseconds);
 		const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
 		if(m_encoderPress.active() && (!modifiers.isAltDown() || !modifiers.isLeftButtonDown()))
 			releaseEncoderPress();

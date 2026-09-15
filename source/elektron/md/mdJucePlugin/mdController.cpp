@@ -3,6 +3,7 @@
 #include "mdPluginProcessor.h"
 #include "mdLib/mdautomation.h"
 #include "mdLib/mddevice.h"
+#include "mdLib/mdpatterndump.h"
 #include "mdLib/mdsysexautomation.h"
 
 #include <algorithm>
@@ -333,6 +334,28 @@ namespace mdJucePlugin
 		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
 		event.sysex = _message;
 		m_synchronizationRequests.fetch_add(1, std::memory_order_relaxed);
+		sendMidiEvent(event);
+	}
+
+	void Controller::setPatternDumpListener(
+		std::function<void(const std::vector<uint8_t>&)> _listener)
+	{
+		const std::lock_guard listenerLock(m_patternDumpListenerLock);
+		m_patternDumpListener = std::move(_listener);
+	}
+
+	void Controller::requestCurrentPatternDump()
+	{
+		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		m_patternDumpPending.store(true, std::memory_order_release);
+		sendSynchronizationRequest(toPluginSysex(md::automation::sysex::statusRequest(
+			m_model, md::automation::sysex::StatusParameter::Pattern)));
+	}
+
+	void Controller::sendSysexToDevice(const std::vector<uint8_t>& _message) const
+	{
+		synthLib::SMidiEvent event(synthLib::MidiEventSource::Editor);
+		event.sysex.assign(_message.begin(), _message.end());
 		sendMidiEvent(event);
 	}
 
@@ -784,7 +807,7 @@ namespace mdJucePlugin
 	}
 
 	bool Controller::parseSysexMessage(const pluginLib::SysEx& _message,
-		synthLib::MidiEventSource)
+		const synthLib::MidiEventSource _source)
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
 		if(const auto status = md::automation::sysex::parseStatusResponse(
@@ -841,6 +864,26 @@ namespace mdJucePlugin
 				return true;
 			}
 			case md::automation::sysex::StatusParameter::Pattern:
+				if(m_patternDumpPending.exchange(false, std::memory_order_acq_rel))
+					sendSynchronizationRequest(toPluginSysex(
+						md::patternDump::request(status->value)));
+				return true;
+			}
+		}
+
+		if(_source == synthLib::MidiEventSource::Device && _message.size() > 14
+			&& _message[6] == md::patternDump::g_patternDump)
+		{
+			const std::vector<uint8_t> dump(_message.begin(), _message.end());
+			if(md::patternDump::isPatternDump(dump))
+			{
+				std::function<void(const std::vector<uint8_t>&)> listener;
+				{
+					const std::lock_guard listenerLock(m_patternDumpListenerLock);
+					listener = m_patternDumpListener;
+				}
+				if(listener)
+					listener(dump);
 				return true;
 			}
 		}

@@ -8,8 +8,10 @@
 
 #include <atomic>
 #include <deque>
+#include <functional>
 #include <map>
 #include <mutex>
+#include <vector>
 
 namespace mdJucePlugin
 {
@@ -73,6 +75,16 @@ namespace mdJucePlugin
 		}
 		int getLastFirmwareKitValue(const pluginLib::Parameter& _parameter) const;
 		void requestAutomationState();
+		// Pattern dump round trip for editor gestures. The listener is invoked on
+		// the controller's protocol thread with device-origin 0x67 dumps.
+		void setPatternDumpListener(std::function<void(const std::vector<uint8_t>&)> _listener);
+		void requestCurrentPatternDump();
+		void sendSysexToDevice(const std::vector<uint8_t>& _message) const;
+		const ParameterList& findTrackParameters(const uint8_t _track,
+			const uint8_t _page, const uint8_t _index) const
+		{
+			return findSynthParam(_track, _page, _index);
+		}
 		std::vector<uint8_t> createAutomationSnapshot() const;
 		bool restoreAutomationSnapshot(const std::vector<uint8_t>& _snapshot);
 
@@ -191,6 +203,9 @@ namespace mdJucePlugin
 		std::atomic<uint64_t> m_realtimeAutomationOverflows{0};
 		mutable std::atomic<uint64_t> m_synchronizationRequests{0};
 		bool m_syntheticFirmwareReadyForTests = false;
+		std::atomic<bool> m_patternDumpPending{false};
+		std::mutex m_patternDumpListenerLock;
+		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
 	};
 }
