@@ -593,6 +593,7 @@ namespace mdJucePlugin
 						&& !m_shiftPanelLatch.empty())
 						releasePanelButtonGestures();
 				});
+			applyScaleQuantizer();
 			m_controller.setPatternDumpListener(
 				[this, token = std::weak_ptr<void>(m_lifetimeToken)](const std::vector<uint8_t>& _dump)
 				{
@@ -1120,12 +1121,12 @@ namespace mdJucePlugin
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		if(!page)
 			return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
-		std::uniform_int_distribution<int> value(0, 127);
 		for(uint8_t index = 0; index < 8; ++index)
 		{
 			const auto& parameters = m_controller.findTrackParameters(*track, *page, index);
+			const auto value = randomParameterValue(*track, *page, index);
 			for(auto* const parameter : parameters)
-				parameter->setUnnormalizedValueNotifyingHost(value(m_random),
+				parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
 					pluginLib::Parameter::Origin::Ui);
 		}
 	}
@@ -1138,7 +1139,7 @@ namespace mdJucePlugin
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		uint8_t page = 0;
-		if(_kind != RandomizeKind::Trigs)
+		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks)
 		{
 			const auto active = activeMachinedrumPage();
 			if(!active)
@@ -1175,7 +1176,6 @@ namespace mdJucePlugin
 		const auto steps = pattern->stepCount();
 		const auto track = pending.track;
 		const uint64_t stepMask = steps >= 64 ? ~0ull : (1ull << steps) - 1;
-		std::uniform_int_distribution<int> value(0, 127);
 
 		if(pending.kind == RandomizeKind::Trigs)
 		{
@@ -1188,6 +1188,18 @@ namespace mdJucePlugin
 			if(trigs == 0)
 				trigs = 1ull << std::uniform_int_distribution<size_t>(0, steps - 1)(m_random);
 			pattern->trigs[track] = trigs;
+		}
+		else if(pending.kind == RandomizeKind::QuantizeLocks)
+		{
+			const auto context = scaleContextForTrack(track);
+			if(!context)
+				return showRandomizeMessage("This track's machine has no pitched PTCH parameter, or no kit dump has been received yet.");
+			if(!pattern->hasLock(track, 0))
+				return showRandomizeMessage("The selected track has no PTCH locks to quantize.");
+			auto& row = pattern->rows[pattern->rowIndex(track, 0)];
+			for(auto& lock : row)
+				if(lock != md::patternDump::g_noLock)
+					lock = md::scale::snap(context->tuning, context->mask, context->root, lock);
 		}
 		else
 		{
@@ -1205,7 +1217,7 @@ namespace mdJucePlugin
 					if(!(trigs >> step & 1u))
 						continue;
 					if(!pattern->setLock(track, param, static_cast<uint8_t>(step),
-						static_cast<uint8_t>(value(m_random))))
+						randomParameterValue(track, pending.page, static_cast<uint8_t>(param - pending.page * 8))))
 						return showRandomizeMessage("This pattern already uses the maximum of 64 parameter-lock rows.");
 				}
 			}
@@ -1961,7 +1973,15 @@ namespace mdJucePlugin
 						&& static_cast<uint8_t>(_encoder) < 8
 						&& juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left)
 					{
-						beginPatternRandomize(RandomizeKind::ParamLocks, static_cast<uint8_t>(_encoder));
+						if(juceRmlUi::helper::getKeyModShift(_event))
+						{
+							if(_encoder == md::PanelEncoder::DataEntryA)
+								beginPatternRandomize(RandomizeKind::QuantizeLocks, 0);
+							else
+								showRandomizeMessage("Shift+Cmd-click encoder A (PTCH) to quantize its locks to the scale.");
+						}
+						else
+							beginPatternRandomize(RandomizeKind::ParamLocks, static_cast<uint8_t>(_encoder));
 						_event.StopPropagation();
 						return;
 					}
@@ -2023,7 +2043,72 @@ namespace mdJucePlugin
 
 		_accum -= static_cast<float>(steps);
 
+		// Scale quantizer: PTCH (encoder A on the SYNTHESIS page) of a pitched
+		// machine steps through scale degrees. Lock edits (a held trig) keep the
+		// firmware's own relative behaviour because the lock value is unknown here.
+		if(m_scale != 0 && _encoder == md::PanelEncoder::DataEntryA
+			&& getModel() == md::MachineModel::Machinedrum && !anyTriggerHeld()
+			&& m_shiftPanelLatch.empty())
+		{
+			const auto track = selectedMachinedrumTrack();
+			const auto page = activeMachinedrumPage();
+			if(track && page && *page == 0)
+			{
+				if(const auto context = scaleContextForTrack(*track))
+				{
+					const auto& parameters = m_controller.findTrackParameters(*track, 0, 0);
+					if(!parameters.empty())
+					{
+						auto value = static_cast<uint8_t>(std::clamp<int>(
+							parameters.front()->getUnnormalizedValue(), 0, 127));
+						for(int i = 0; i < std::abs(steps); ++i)
+							value = md::scale::step(context->tuning, context->mask, context->root,
+								value, steps > 0 ? 1 : -1);
+						for(auto* const parameter : parameters)
+							parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
+								pluginLib::Parameter::Origin::Ui);
+						return;
+					}
+				}
+			}
+		}
+
 		emitEncoderSteps(_encoder, steps);
+	}
+
+	void Editor::applyScaleQuantizer()
+	{
+		auto& config = getProcessor().getConfig();
+		m_scale = static_cast<uint8_t>(std::clamp(config.getIntValue(g_scaleConfigKey, 0), 0,
+			static_cast<int>(md::scale::g_scaleCount) - 1));
+		m_scaleRoot = static_cast<uint8_t>(std::clamp(config.getIntValue(g_scaleRootConfigKey, 0), 0, 11));
+	}
+
+	std::optional<Editor::ScaleContext> Editor::scaleContextForTrack(const uint8_t _track) const
+	{
+		if(m_scale == 0)
+			return std::nullopt;
+		const auto tuning = md::scale::tuningForModel(m_controller.getTrackModel(_track));
+		if(!tuning)
+			return std::nullopt;
+		return ScaleContext{*tuning, md::scale::scaleMask(m_scale), m_scaleRoot};
+	}
+
+	bool Editor::anyTriggerHeld() const
+	{
+		for(int control = static_cast<int>(md::PanelControl::Trigger1);
+			control <= static_cast<int>(md::PanelControl::Trigger16); ++control)
+			if(isPanelControlHeld(static_cast<md::PanelControl>(control)))
+				return true;
+		return false;
+	}
+
+	uint8_t Editor::randomParameterValue(const uint8_t _track, const uint8_t _page, const uint8_t _index)
+	{
+		if(_page == 0 && _index == 0)
+			if(const auto context = scaleContextForTrack(_track))
+				return md::scale::random(context->tuning, context->mask, context->root, m_random);
+		return static_cast<uint8_t>(std::uniform_int_distribution<int>(0, 127)(m_random));
 	}
 
 	void Editor::emitEncoderSteps(const md::PanelEncoder _encoder, const int _steps) const

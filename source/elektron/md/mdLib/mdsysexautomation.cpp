@@ -254,7 +254,27 @@ namespace md::automation::sysex
 				result.push_back({machinedrum::Level, track, 0,
 					_message[levelPosition + track]});
 			}
-			return KitDump{slot, std::move(result)};
+			KitDump dump{slot, std::move(result), {}};
+			dump.models.fill(0xffffffff);
+			// Machine models: 16 x 32-bit, 7-bit packed (74 bytes) right after
+			// the track levels.
+			constexpr size_t modelPosition = 0x1aa;
+			if(_message.size() > modelPosition + 74 + 5)
+			{
+				std::vector<uint8_t> raw;
+				for(size_t p = modelPosition; p < modelPosition + 74;)
+				{
+					const auto msb = _message[p++];
+					for(uint8_t i = 0; i < 7 && p < modelPosition + 74; ++i, ++p)
+						raw.push_back(static_cast<uint8_t>(_message[p] | ((msb >> (6 - i)) & 1u) << 7));
+				}
+				for(size_t track = 0; track < 16 && track * 4 + 3 < raw.size(); ++track)
+					dump.models[track] = static_cast<uint32_t>(raw[track * 4]) << 24
+						| static_cast<uint32_t>(raw[track * 4 + 1]) << 16
+						| static_cast<uint32_t>(raw[track * 4 + 2]) << 8
+						| raw[track * 4 + 3];
+			}
+			return dump;
 		}
 
 		const auto decoded = decodeMonomachinePayload(_message);
@@ -280,6 +300,8 @@ namespace md::automation::sysex
 			result.push_back({monomachine::Level, track, 0,
 				(*decoded)[levelPosition + track]});
 		}
-		return KitDump{slot, std::move(result)};
+		KitDump dump{slot, std::move(result), {}};
+		dump.models.fill(0xffffffff);
+		return dump;
 	}
 }

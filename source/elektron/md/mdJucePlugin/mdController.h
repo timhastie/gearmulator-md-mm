@@ -6,6 +6,7 @@
 #include "mdLib/mdtypes.h"
 #include "mdRealtimeQueue.h"
 
+#include <array>
 #include <atomic>
 #include <deque>
 #include <functional>
@@ -80,6 +81,12 @@ namespace mdJucePlugin
 		void setPatternDumpListener(std::function<void(const std::vector<uint8_t>&)> _listener);
 		void requestCurrentPatternDump();
 		void sendSysexToDevice(const std::vector<uint8_t>& _message) const;
+		// Kit-dump machine model word for a Machinedrum track, 0xffffffff when
+		// no kit dump has been seen yet (see md::scale::tuningForModel).
+		uint32_t getTrackModel(const uint8_t _track) const
+		{
+			return _track < 16 ? m_trackModels[_track].load(std::memory_order_acquire) : 0xffffffffu;
+		}
 		const ParameterList& findTrackParameters(const uint8_t _track,
 			const uint8_t _page, const uint8_t _index) const
 		{
@@ -204,6 +211,7 @@ namespace mdJucePlugin
 		mutable std::atomic<uint64_t> m_synchronizationRequests{0};
 		bool m_syntheticFirmwareReadyForTests = false;
 		std::atomic<bool> m_patternDumpPending{false};
+		std::array<std::atomic<uint32_t>, 16> m_trackModels;
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)

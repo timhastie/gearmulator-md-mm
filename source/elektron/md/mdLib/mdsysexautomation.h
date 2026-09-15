@@ -2,6 +2,7 @@
 
 #include "mdautomation.h"
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <vector>
@@ -50,6 +51,9 @@ namespace md::automation::sysex
 	{
 		uint8_t slot;
 		std::vector<ParameterChange> parameters;
+		// Machinedrum machine model word per track (0xffffffff when absent).
+		// Bits 16/17 flag TONAL tuning on the unofficial X firmware.
+		std::array<uint32_t, 16> models{};
 	};
 
 	Message statusRequest(MachineModel _model, StatusParameter _parameter);

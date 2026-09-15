@@ -20,6 +20,7 @@ set(SOURCES
 	mdmemorymap.h
 	mdmidiprotocol.h
 	mdpatterndump.cpp mdpatterndump.h
+	mdscale.cpp mdscale.h
 	mdsysexautomation.cpp mdsysexautomation.h
 	mdrealtimemidiqueue.h
 	mdpanel.cpp mdpanel.h

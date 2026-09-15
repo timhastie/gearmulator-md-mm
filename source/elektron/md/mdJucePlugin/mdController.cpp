@@ -40,6 +40,8 @@ namespace mdJucePlugin
 			? "parameterDescriptions_mm.json" : "parameterDescriptions_md.json")
 		, m_model(_p.getModel())
 	{
+		for(auto& model : m_trackModels)
+			model.store(0xffffffffu, std::memory_order_relaxed);
 		registerParams(_p, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
 			return _nonPartSensitive ? juce::String("Global")
@@ -871,6 +873,20 @@ namespace mdJucePlugin
 			}
 		}
 
+		// X firmware 0x63 MACHINE UPDATE: keep the per-track model current when a
+		// machine is assigned without a kit change.
+		if(_source == synthLib::MidiEventSource::Device && _message.size() >= 11
+			&& m_model == md::MachineModel::Machinedrum && _message[6] == 0x63
+			&& _message[1] == 0x00 && _message[2] == 0x20 && _message[3] == 0x3c)
+		{
+			const auto track = static_cast<uint8_t>(_message[7] & 0x0f);
+			uint32_t model = _message[8];
+			if(_message[9] & 0x01) model += 128;
+			if(_message[9] & 0x02) model |= 0x20000;
+			m_trackModels[track].store(model, std::memory_order_release);
+			return false;
+		}
+
 		if(_source == synthLib::MidiEventSource::Device && _message.size() > 14
 			&& _message[6] == md::patternDump::g_patternDump)
 		{
@@ -909,6 +925,8 @@ namespace mdJucePlugin
 		{
 			if(!m_kitSynchronization.acceptDump(kit->slot))
 				return true;
+			for(size_t track = 0; track < m_trackModels.size(); ++track)
+				m_trackModels[track].store(kit->models[track], std::memory_order_release);
 			if(m_applyRequestedKitDump.exchange(true, std::memory_order_acq_rel))
 				applyKitParameters(kit->parameters);
 			else

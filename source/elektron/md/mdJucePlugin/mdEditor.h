@@ -11,6 +11,7 @@
 #include "jucePluginEditorLib/pluginEditor.h"
 
 #include "mdFrontPanelPresentation.h"
+#include "mdLib/mdscale.h"
 #include "mdLcdGesture.h"
 #include "mdLcdInteractionModel.h"
 #include "mdPanelAffordances.h"
@@ -88,6 +89,10 @@ namespace mdJucePlugin
 		std::weak_ptr<void> getLifetimeToken() const { return m_lifetimeToken; }
 
 		static constexpr int g_panelSpeedPercents[] = {50, 75, 100, 150, 200, 300};
+		// Scale quantizer (see mdLib/mdscale.h). Config keys are shared with the settings page.
+		static constexpr const char* g_scaleConfigKey = "mdScaleQuantizer";
+		static constexpr const char* g_scaleRootConfigKey = "mdScaleRoot";
+		void applyScaleQuantizer();
 
 	private:
 		friend struct EditorIdentityTestAccess;
@@ -128,7 +133,7 @@ namespace mdJucePlugin
 		void selectMachinedrumTrack(int _track);
 		// Randomize gestures (Machinedrum only). Pattern edits round-trip the
 		// current pattern through a SysEx dump so the firmware owns the result.
-		enum class RandomizeKind { Trigs, PageLocks, ParamLocks };
+		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks };
 		void beginPatternRandomize(RandomizeKind _kind, std::optional<uint8_t> _param);
 		void onPatternDumpReceived(std::vector<uint8_t> _dump);
 		void randomizePageParameters();
@@ -137,6 +142,15 @@ namespace mdJucePlugin
 		std::optional<uint8_t> activeMachinedrumPage() const;
 		bool isPanelControlHeld(md::PanelControl _control) const;
 		static void showRandomizeMessage(const std::string& _message);
+		struct ScaleContext
+		{
+			md::scale::Tuning tuning;
+			uint16_t mask;
+			uint8_t root;
+		};
+		std::optional<ScaleContext> scaleContextForTrack(uint8_t _track) const;
+		bool anyTriggerHeld() const;
+		uint8_t randomParameterValue(uint8_t _track, uint8_t _page, uint8_t _index);
 		void selectMachinedrumDataPage(int _page);
 		void selectMonomachineDataPage(int _page);
 		void selectMonomachineTrigMode(int _mode);
@@ -281,6 +295,8 @@ namespace mdJucePlugin
 			double startedMilliseconds;
 		};
 		std::optional<PendingRandomize> m_pendingRandomize;
+		uint8_t m_scale = 0;
+		uint8_t m_scaleRoot = 0;
 		std::mt19937 m_random{std::random_device{}()};
 		std::shared_ptr<void> m_lifetimeToken = std::make_shared<int>(0);
 	};
