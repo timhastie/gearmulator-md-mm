@@ -5,7 +5,7 @@
 	<div class="settings-page">
 		<h1>Random Trigs</h1>
 		<settingsspacer1/>
-		<label>Chance that each step receives a trig when a random-trig chord fires (FUNCTION + DOWN for the selected track, FUNCTION + BANK GROUP or BANK GROUP + YES for every track). A track never ends up empty. Double-click the slider to reset to 50 %.</label>
+		<label>Chance that each step receives a trig when a random-trig chord fires (FUNCTION + DOWN for the selected track, FUNCTION + BANK GROUP or BANK GROUP + YES for every track). Double-click the slider to reset to 50 %.</label>
 		<settingsspacer1/>
 		<div class="settings-hlayout">
 			<input id="sliderTrigChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>

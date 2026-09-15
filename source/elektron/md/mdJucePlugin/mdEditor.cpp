@@ -1264,8 +1264,6 @@ namespace mdJucePlugin
 			for(size_t step = 0; step < steps; ++step)
 				if(hit(m_random))
 					trigs |= 1ull << step;
-			if(trigs == 0)
-				trigs = 1ull << std::uniform_int_distribution<size_t>(0, steps - 1)(m_random);
 			pattern->trigs[_track] = trigs;
 		};
 
