@@ -1121,6 +1121,7 @@ namespace mdJucePlugin
 
 	void Editor::randomizePageParameters()
 	{
+		applyScaleQuantizer();
 		const auto track = selectedMachinedrumTrack();
 		const auto page = activeMachinedrumPage();
 		if(!track)
@@ -1165,6 +1166,7 @@ namespace mdJucePlugin
 	{
 		if(m_pendingRandomize)
 			return;
+		applyScaleQuantizer();
 		const auto track = selectedMachinedrumTrack();
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
@@ -2098,6 +2100,8 @@ namespace mdJucePlugin
 		// Scale quantizer: PTCH (encoder A on the SYNTHESIS page) of a pitched
 		// machine steps through scale degrees. Lock edits (a held trig) keep the
 		// firmware's own relative behaviour because the lock value is unknown here.
+		if(_encoder == md::PanelEncoder::DataEntryA && getModel() == md::MachineModel::Machinedrum)
+			applyScaleQuantizer();
 		if(m_scale != 0 && _encoder == md::PanelEncoder::DataEntryA
 			&& getModel() == md::MachineModel::Machinedrum && !anyTriggerHeld()
 			&& m_shiftPanelLatch.empty())
