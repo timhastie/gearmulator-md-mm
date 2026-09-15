@@ -5,6 +5,7 @@
 #include "mdPluginProcessor.h"
 #include "mdSettingsAudioInput.h"
 #include "mdSettingsPanelFeel.h"
+#include "mdSettingsScale.h"
 #include "mdPixelPerfectPanel.h"
 #include "mdLcdViewport.h"
 
@@ -40,6 +41,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <random>
 #include <functional>
 #include <string>
 #include <vector>
@@ -655,6 +657,26 @@ namespace mdJucePlugin
 					? RandomizeKind::PageLocks : RandomizeKind::Trigs, std::nullopt);
 		}
 
+		// Whole-pattern chords: FUNCTION + BANK GROUP (trigs on every track),
+		// FUNCTION + CLASSIC/EXTENDED (locks on every trig of every track),
+		// BANK GROUP + NO (random machine on every track), BANK GROUP + YES (all three).
+		if(getModel() == md::MachineModel::Machinedrum)
+		{
+			const auto functionHeld = isPanelControlHeld(md::PanelControl::Function);
+			const auto bankGroupHeld = isPanelControlHeld(md::PanelControl::BankGroup);
+			if(_control == md::PanelControl::BankGroup && functionHeld)
+				return beginPatternRandomize(RandomizeKind::AllTrigs, std::nullopt);
+			if(_control == md::PanelControl::ClassicExtended && functionHeld)
+				return beginPatternRandomize(RandomizeKind::AllLocks, std::nullopt);
+			if(_control == md::PanelControl::Exit && bankGroupHeld)
+				return randomizeAllMachines();
+			if(_control == md::PanelControl::Enter && bankGroupHeld)
+			{
+				randomizeAllMachines();
+				return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
+			}
+		}
+
 		// BANK GROUP held + trig key: assign a random machine to that track.
 		if(getModel() == md::MachineModel::Machinedrum && isTrigger(_control)
 			&& isPanelControlHeld(md::PanelControl::BankGroup))
@@ -1162,18 +1184,33 @@ namespace mdJucePlugin
 		m_controller.sendSysexToDevice(message);
 	}
 
+	void Editor::randomizeAllMachines()
+	{
+		for(uint8_t track = 0; track < 16; ++track)
+			randomizeTrackMachine(track);
+	}
+
+	void Editor::registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins)
+	{
+		if(getModel() == md::MachineModel::Machinedrum)
+			_plugins.push_back(std::make_unique<SettingsScale>(*this, getProcessor()));
+		jucePluginEditorLib::Editor::registerSettings(_plugins);
+	}
+
 	void Editor::beginPatternRandomize(const RandomizeKind _kind, const std::optional<uint8_t> _param)
 	{
 		if(m_pendingRandomize)
 			return;
 		applyScaleQuantizer();
-		const auto track = selectedMachinedrumTrack();
+		const bool wholePattern = _kind == RandomizeKind::AllTrigs
+			|| _kind == RandomizeKind::AllLocks || _kind == RandomizeKind::Everything;
+		const auto track = wholePattern ? std::optional<uint8_t>(0) : selectedMachinedrumTrack();
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		uint8_t page = 0;
 		if(_kind == RandomizeKind::QuantizeLocks && m_scale == 0)
 			return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
-		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks)
+		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks && !wholePattern)
 		{
 			const auto active = activeMachinedrumPage();
 			if(!active)
@@ -1216,7 +1253,7 @@ namespace mdJucePlugin
 		const auto track = pending.track;
 		const uint64_t stepMask = steps >= 64 ? ~0ull : (1ull << steps) - 1;
 
-		if(pending.kind == RandomizeKind::Trigs)
+		const auto randomTrigs = [&](const uint8_t _track)
 		{
 			std::uniform_real_distribution<float> densityRange(0.3f, 0.7f);
 			std::bernoulli_distribution hit(densityRange(m_random));
@@ -1226,8 +1263,48 @@ namespace mdJucePlugin
 					trigs |= 1ull << step;
 			if(trigs == 0)
 				trigs = 1ull << std::uniform_int_distribution<size_t>(0, steps - 1)(m_random);
-			pattern->trigs[track] = trigs;
+			pattern->trigs[_track] = trigs;
+		};
+
+		if(pending.kind == RandomizeKind::AllTrigs || pending.kind == RandomizeKind::AllLocks
+			|| pending.kind == RandomizeKind::Everything)
+		{
+			if(pending.kind != RandomizeKind::AllLocks)
+				for(uint8_t t = 0; t < md::patternDump::g_tracks; ++t)
+					randomTrigs(t);
+			if(pending.kind != RandomizeKind::AllTrigs)
+			{
+				// The pattern format holds at most 64 lock rows (track/parameter
+				// pairs), so every track with trigs gets an equal share of random
+				// parameters. Existing locks are replaced.
+				pattern->rows.clear();
+				for(auto& mask : pattern->lockMasks)
+					mask = 0;
+				std::vector<uint8_t> tracks;
+				for(uint8_t t = 0; t < md::patternDump::g_tracks; ++t)
+					if(pattern->trigs[t] & stepMask)
+						tracks.push_back(t);
+				const size_t perTrack = tracks.empty() ? 0
+					: std::min<size_t>(md::patternDump::g_classicParams, md::patternDump::g_maxRows / tracks.size());
+				for(const auto t : tracks)
+				{
+					std::array<uint8_t, md::patternDump::g_classicParams> params{};
+					for(uint8_t i = 0; i < params.size(); ++i) params[i] = i;
+					std::shuffle(params.begin(), params.end(), m_random);
+					const auto trigs = pattern->trigs[t] & stepMask;
+					for(size_t i = 0; i < perTrack; ++i)
+					{
+						const auto param = params[i];
+						for(size_t step = 0; step < steps; ++step)
+							if(trigs >> step & 1u)
+								(void)pattern->setLock(t, param, static_cast<uint8_t>(step),
+									randomParameterValue(t, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)));
+					}
+				}
+			}
 		}
+		else if(pending.kind == RandomizeKind::Trigs)
+			randomTrigs(track);
 		else if(pending.kind == RandomizeKind::QuantizeLocks)
 		{
 			const auto context = scaleContextForTrack(track);

@@ -133,11 +133,13 @@ namespace mdJucePlugin
 		void selectMachinedrumTrack(int _track);
 		// Randomize gestures (Machinedrum only). Pattern edits round-trip the
 		// current pattern through a SysEx dump so the firmware owns the result.
-		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks };
+		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks, AllTrigs, AllLocks, Everything };
 		void beginPatternRandomize(RandomizeKind _kind, std::optional<uint8_t> _param);
 		void onPatternDumpReceived(std::vector<uint8_t> _dump);
 		void randomizePageParameters();
 		void randomizeTrackMachine(uint8_t _track);
+		void randomizeAllMachines();
+		void registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins) override;
 		void servicePendingRandomize(double _nowMilliseconds);
 		std::optional<uint8_t> selectedMachinedrumTrack() const;
 		std::optional<uint8_t> activeMachinedrumPage() const;

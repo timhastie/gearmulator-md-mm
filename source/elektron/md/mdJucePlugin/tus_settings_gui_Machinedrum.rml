@@ -20,20 +20,6 @@
 	<label>Works on synthesis parameters, LFO edit, and Master FX. Menus, tabs, empty cells, and other LCD controls remain inert.</label>
 
 	<settingsspacer1/>
-	<h1>Scale Quantizer</h1>
-	<settingsspacer1/>
-	<label>With a scale on, the PTCH encoder (A on the SYNTHESIS page) of a pitched machine steps through scale degrees, random locks and values for PTCH stay in key, and FUNCTION + click on encoder A snaps the track's existing PTCH locks to the scale.</label>
-	<settingsspacer1/>
-	<div class="settings-hlayout">
-		<label>Scale</label>
-		<combo class="settings-combo" id="cbScaleQuantizer"/>
-	</div>
-	<settingsspacer1/>
-	<div class="settings-hlayout">
-		<label>Root</label>
-		<combo class="settings-combo" id="cbScaleRoot"/>
-	</div>
-	<settingsspacer1/>
 	<div class="settings-advanced">
 		<h1>Panel Feel</h1>
 		<settingsspacer1/>
