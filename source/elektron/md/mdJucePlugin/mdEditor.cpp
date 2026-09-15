@@ -1163,6 +1163,8 @@ namespace mdJucePlugin
 
 	void Editor::randomizeTrackMachine(const uint8_t _track)
 	{
+		if(m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, _track))
+			return m_controller.diagnostic("randomize machine: track " + std::to_string(_track + 1) + " excluded");
 		// Synthesis machines only: GND (no silent "---"), TRX, EFM, E12, P-I.
 		// ROM/RAM, input, MIDI and control machines are skipped.
 		static constexpr uint8_t models[] =
@@ -1211,6 +1213,13 @@ namespace mdJucePlugin
 		const auto track = wholePattern ? std::optional<uint8_t>(0) : selectedMachinedrumTrack();
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
+		if(!wholePattern)
+		{
+			const auto aspect = _kind == RandomizeKind::Trigs ? Controller::RandomizeAspect::Trigs
+				: Controller::RandomizeAspect::Locks;
+			if(_kind != RandomizeKind::QuantizeLocks && m_controller.isTrackExcluded(aspect, *track))
+				return m_controller.diagnostic("randomize: track " + std::to_string(*track + 1) + " excluded");
+		}
 		uint8_t page = 0;
 		if(_kind == RandomizeKind::QuantizeLocks && m_scale == 0)
 			return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
@@ -1272,21 +1281,33 @@ namespace mdJucePlugin
 		{
 			if(pending.kind != RandomizeKind::AllLocks)
 				for(uint8_t t = 0; t < md::patternDump::g_tracks; ++t)
-					randomTrigs(t);
+					if(!m_controller.isTrackExcluded(Controller::RandomizeAspect::Trigs, t))
+						randomTrigs(t);
 			if(pending.kind != RandomizeKind::AllTrigs)
 			{
 				// The pattern format holds at most 64 lock rows (track/parameter
-				// pairs), so every track with trigs gets an equal share of random
-				// parameters. Existing locks are replaced.
-				pattern->rows.clear();
-				for(auto& mask : pattern->lockMasks)
-					mask = 0;
+				// pairs), so every included track with trigs gets an equal share of
+				// random parameters. Included tracks lose their existing locks;
+				// excluded tracks keep theirs and their rows.
 				std::vector<uint8_t> tracks;
 				for(uint8_t t = 0; t < md::patternDump::g_tracks; ++t)
+				{
+					if(m_controller.isTrackExcluded(Controller::RandomizeAspect::Locks, t))
+						continue;
+					for(size_t param = pattern->lockSlotCount; param-- > 0;)
+					{
+						if(!pattern->hasLock(t, static_cast<uint8_t>(param)))
+							continue;
+						pattern->rows.erase(pattern->rows.begin()
+							+ static_cast<std::ptrdiff_t>(pattern->rowIndex(t, static_cast<uint8_t>(param))));
+						pattern->lockMasks[t] &= ~(1ull << param);
+					}
 					if(pattern->trigs[t] & stepMask)
 						tracks.push_back(t);
+				}
+				const size_t budget = md::patternDump::g_maxRows - std::min(pattern->rows.size(), md::patternDump::g_maxRows);
 				const size_t perTrack = tracks.empty() ? 0
-					: std::min<size_t>(md::patternDump::g_classicParams, md::patternDump::g_maxRows / tracks.size());
+					: std::min<size_t>(md::patternDump::g_classicParams, budget / tracks.size());
 				for(const auto t : tracks)
 				{
 					std::array<uint8_t, md::patternDump::g_classicParams> params{};

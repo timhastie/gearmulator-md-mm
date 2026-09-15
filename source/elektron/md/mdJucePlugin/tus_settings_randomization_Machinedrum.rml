@@ -12,6 +12,109 @@
 			<label id="labelTrigChance">50 %</label>
 		</div>
 		<settingsspacer1/>
+		<h1>Include Tracks</h1>
+		<settingsspacer1/>
+		<label>Untick a track to leave it out of the randomize gestures: its trigs, its machine, or its parameter locks. All tracks are included by default. Saved with the plugin state, so it travels with your DAW project.</label>
+		<settingsspacer1/>
+		<table class="settings-table">
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 1</label></td>
+				<td class="settings-td"><div id="exTrig0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 2</label></td>
+				<td class="settings-td"><div id="exTrig1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 3</label></td>
+				<td class="settings-td"><div id="exTrig2" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach2" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock2" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 4</label></td>
+				<td class="settings-td"><div id="exTrig3" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach3" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock3" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 5</label></td>
+				<td class="settings-td"><div id="exTrig4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 6</label></td>
+				<td class="settings-td"><div id="exTrig5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 7</label></td>
+				<td class="settings-td"><div id="exTrig6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 8</label></td>
+				<td class="settings-td"><div id="exTrig7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 9</label></td>
+				<td class="settings-td"><div id="exTrig8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 10</label></td>
+				<td class="settings-td"><div id="exTrig9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 11</label></td>
+				<td class="settings-td"><div id="exTrig10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 12</label></td>
+				<td class="settings-td"><div id="exTrig11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 13</label></td>
+				<td class="settings-td"><div id="exTrig12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 14</label></td>
+				<td class="settings-td"><div id="exTrig13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 15</label></td>
+				<td class="settings-td"><div id="exTrig14" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach14" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock14" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+			<tr class="settings-tr">
+				<td class="settings-td"><label>Track 16</label></td>
+				<td class="settings-td"><div id="exTrig15" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Trigs</label></div></td>
+				<td class="settings-td"><div id="exMach15" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Machine</label></div></td>
+				<td class="settings-td"><div id="exLock15" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Locks</label></div></td>
+			</tr>
+		</table>
+		<settingsspacer1/>
 	</div>
 </body>
 </template>

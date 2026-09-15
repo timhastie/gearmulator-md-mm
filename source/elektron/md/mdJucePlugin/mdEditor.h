@@ -93,6 +93,7 @@ namespace mdJucePlugin
 		static constexpr const char* g_scaleConfigKey = "mdScaleQuantizer";
 		static constexpr const char* g_scaleRootConfigKey = "mdScaleRoot";
 		void applyScaleQuantizer();	// also re-reads the randomization settings
+		Controller& getMdController() { return m_controller; }
 		static constexpr const char* g_trigChanceConfigKey = "mdRandomTrigChancePercent";
 		static constexpr int g_trigChanceDefault = 50;
 

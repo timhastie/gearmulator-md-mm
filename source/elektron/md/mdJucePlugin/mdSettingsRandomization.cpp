@@ -1,6 +1,8 @@
 #include "mdSettingsRandomization.h"
 
 #include "mdEditor.h"
+#include "mdController.h"
+#include "juceRmlUi/rmlElemButton.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
 #include "juceRmlUi/rmlEventListener.h"
@@ -16,6 +18,37 @@ namespace mdJucePlugin
 {
 	void SettingsRandomization::createUi(Rml::Element* _root)
 	{
+		// Include/exclude grid: checked = included.
+		{
+			auto& controller = m_editor.getMdController();
+			const struct { const char* prefix; Controller::RandomizeAspect aspect; } columns[] =
+			{
+				{"exTrig", Controller::RandomizeAspect::Trigs},
+				{"exMach", Controller::RandomizeAspect::Machines},
+				{"exLock", Controller::RandomizeAspect::Locks},
+			};
+			for(const auto& column : columns)
+			{
+				for(uint8_t track = 0; track < 16; ++track)
+				{
+					auto* const row = juceRmlUi::helper::findChild(_root, column.prefix + std::to_string(track), false);
+					if(!row)
+						continue;
+					auto* const button = juceRmlUi::helper::findChildT<juceRmlUi::ElemButton>(row, "button");
+					if(!button)
+						continue;
+					const auto aspect = column.aspect;
+					juceRmlUi::ElemButton::setChecked(button, !controller.isTrackExcluded(aspect, track));
+					juceRmlUi::EventListener::AddClick(row, [&controller, button, aspect, track]
+					{
+						const auto include = !juceRmlUi::ElemButton::isChecked(button);
+						controller.setTrackExcluded(aspect, track, !include);
+						juceRmlUi::ElemButton::setChecked(button, include);
+					});
+				}
+			}
+		}
+
 		auto* const slider = juceRmlUi::helper::findChild(_root, "sliderTrigChance", false);
 		auto* const label = juceRmlUi::helper::findChild(_root, "labelTrigChance", false);
 		if(!slider || !label)

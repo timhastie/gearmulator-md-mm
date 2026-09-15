@@ -116,6 +116,12 @@ namespace mdJucePlugin
 			baseLib::ChunkWriter chunk(_stream, "AUTO", 1);
 			_stream.write(snapshot);
 		}
+		{
+			// Randomize exclusions: trigs, machines, locks (one 16-bit track mask each).
+			baseLib::ChunkWriter chunk(_stream, "RXCL", 1);
+			for(uint8_t aspect = 0; aspect < 3; ++aspect)
+				_stream.write(controller.getExcludeMask(static_cast<Controller::RandomizeAspect>(aspect)));
+		}
 	}
 
 	void AudioPluginAudioProcessor::loadChunkData(baseLib::ChunkReader& _reader)
@@ -127,6 +133,12 @@ namespace mdJucePlugin
 			_stream.read(snapshot);
 			auto& controller = dynamic_cast<Controller&>(getController());
 			(void)controller.restoreAutomationSnapshot(snapshot);
+		});
+		_reader.add("RXCL", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		{
+			auto& controller = dynamic_cast<Controller&>(getController());
+			for(uint8_t aspect = 0; aspect < 3; ++aspect)
+				controller.setExcludeMask(static_cast<Controller::RandomizeAspect>(aspect), _stream.read<uint16_t>());
 		});
 	}
 

@@ -85,6 +85,28 @@ namespace mdJucePlugin
 		bool saveCurrentKit() const;
 		// Appends a timestamped line to <data folder>/logs/randomize.log and stderr.
 		void diagnostic(const std::string& _message) const;
+		// Per-track exclusion from the randomize gestures, saved with the plugin state.
+		enum class RandomizeAspect : uint8_t { Trigs = 0, Machines = 1, Locks = 2 };
+		bool isTrackExcluded(const RandomizeAspect _aspect, const uint8_t _track) const
+		{
+			return _track < 16 && (m_randomizeExclude[static_cast<size_t>(_aspect)].load(std::memory_order_acquire) >> _track & 1u);
+		}
+		void setTrackExcluded(const RandomizeAspect _aspect, const uint8_t _track, const bool _excluded)
+		{
+			if(_track >= 16) return;
+			auto& mask = m_randomizeExclude[static_cast<size_t>(_aspect)];
+			auto value = mask.load(std::memory_order_acquire);
+			value = _excluded ? static_cast<uint16_t>(value | 1u << _track) : static_cast<uint16_t>(value & ~(1u << _track));
+			mask.store(value, std::memory_order_release);
+		}
+		uint16_t getExcludeMask(const RandomizeAspect _aspect) const
+		{
+			return m_randomizeExclude[static_cast<size_t>(_aspect)].load(std::memory_order_acquire);
+		}
+		void setExcludeMask(const RandomizeAspect _aspect, const uint16_t _mask)
+		{
+			m_randomizeExclude[static_cast<size_t>(_aspect)].store(_mask, std::memory_order_release);
+		}
 		// Kit-dump machine model word for a Machinedrum track, 0xffffffff when
 		// no kit dump has been seen yet (see md::scale::tuningForModel).
 		uint32_t getTrackModel(const uint8_t _track) const
@@ -216,6 +238,7 @@ namespace mdJucePlugin
 		bool m_syntheticFirmwareReadyForTests = false;
 		std::atomic<bool> m_patternDumpPending{false};
 		std::array<std::atomic<uint32_t>, 16> m_trackModels;
+		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
