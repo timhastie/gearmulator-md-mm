@@ -1270,6 +1270,11 @@ namespace mdJucePlugin
 			}
 		}
 
+		// Receiving a pattern makes the firmware reload it together with its kit,
+		// which would discard unsaved kit edits (machine assignments, parameter
+		// tweaks). Commit the live kit to its slot first so the reload is a no-op.
+		if(!m_controller.saveCurrentKit())
+			m_controller.diagnostic("randomize: current kit slot unknown, kit not saved before pattern send");
 		const auto encoded = md::patternDump::encode(*pattern);
 		m_controller.diagnostic("randomize: sending pattern " + std::to_string(pattern->position) + " ("
 			+ std::to_string(encoded.size()) + " bytes, " + std::to_string(pattern->rows.size()) + " lock rows)");

@@ -348,6 +348,15 @@ namespace mdJucePlugin
 		file.appendText(juce::Time::getCurrentTime().toString(true, true, true, true) + "  " + _message + "\n");
 	}
 
+	bool Controller::saveCurrentKit() const
+	{
+		const auto kit = m_currentKit.load(std::memory_order_acquire);
+		if(kit == 0xff)
+			return false;
+		sendSysexToDevice(md::automation::sysex::kitSave(m_model, kit));
+		return true;
+	}
+
 	void Controller::setPatternDumpListener(
 		std::function<void(const std::vector<uint8_t>&)> _listener)
 	{

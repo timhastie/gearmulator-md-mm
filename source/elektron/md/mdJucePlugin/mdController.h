@@ -81,6 +81,8 @@ namespace mdJucePlugin
 		void setPatternDumpListener(std::function<void(const std::vector<uint8_t>&)> _listener);
 		void requestCurrentPatternDump();
 		void sendSysexToDevice(const std::vector<uint8_t>& _message) const;
+		// Saves the live kit into its own slot. Returns false when the slot is unknown.
+		bool saveCurrentKit() const;
 		// Appends a timestamped line to <data folder>/logs/randomize.log and stderr.
 		void diagnostic(const std::string& _message) const;
 		// Kit-dump machine model word for a Machinedrum track, 0xffffffff when
