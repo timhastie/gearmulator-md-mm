@@ -960,14 +960,41 @@ namespace mdJucePlugin
 		synthLib::DeviceCreateParams params;
 		params.customData = md::deviceCustomData(m_model);
 		params.homePath = m_deviceHomePath ? *m_deviceHomePath : getDataFolder();
+		// The shared ROM search path list is process-global and can be empty or
+		// stale inside some hosts. Read the ROM straight from this instance's own
+		// roms folder first so device creation never depends on that list.
+		{
+			const auto romFolder = getPublicRomFolder();
+			for(const auto& file : synthLib::RomLoader::findFiles(romFolder, ".bin", md::g_romSize, md::g_romSize))
+			{
+				md::Rom rom(file);
+				if(rom.isValid() && md::RomLoader::isRomForModel(rom.data(), m_model))
+				{
+					params.romData.assign(rom.data().begin(), rom.data().end());
+					params.romName = rom.getFilename();
+					break;
+				}
+			}
+		}
 		auto d = std::make_unique<md::Device>(params, m_initialPatchRam);
 		if(!d->isValid())
+		{
+			// Leave a trace the host cannot swallow.
+			const auto log = juce::File(getDataFolder()).getChildFile("logs").getChildFile("device-init.log");
+			log.getParentDirectory().createDirectory();
+			juce::String text = juce::Time::getCurrentTime().toString(true, true, true, true)
+				+ "  device init failed; rom folder " + juce::String(getPublicRomFolder())
+				+ ", direct rom " + (params.romData.empty() ? "not loaded" : juce::String(params.romName)) + "\n";
+			for(const auto& file : synthLib::RomLoader::findFiles(".bin", md::g_romSize, md::g_romSize))
+				text += "  search-path candidate: " + juce::String(file) + "\n";
+			log.appendText(text);
 			throw synthLib::DeviceException(synthLib::DeviceError::FirmwareMissing,
 				std::string("A ") + productName(m_model) +
 				" firmware rom (8 MB .bin) is required, but was not found.\n\n"
 				"Do NOT discuss firmware or ROMs in Discord. "
 				"Do not request or share files or download links, "
 				"or ask for help obtaining or installing firmware.");
+		}
 		return d.release();
 	}
 
