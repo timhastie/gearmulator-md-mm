@@ -118,9 +118,10 @@ namespace mdJucePlugin
 		}
 		{
 			// Randomize exclusions: trigs, machines, locks (one 16-bit track mask each).
-			baseLib::ChunkWriter chunk(_stream, "RXCL", 1);
+			baseLib::ChunkWriter chunk(_stream, "RXCL", 2);
 			for(uint8_t aspect = 0; aspect < 3; ++aspect)
 				_stream.write(controller.getExcludeMask(static_cast<Controller::RandomizeAspect>(aspect)));
+			_stream.write(static_cast<uint8_t>(controller.getTrigChancePercent()));
 		}
 	}
 
@@ -134,11 +135,13 @@ namespace mdJucePlugin
 			auto& controller = dynamic_cast<Controller&>(getController());
 			(void)controller.restoreAutomationSnapshot(snapshot);
 		});
-		_reader.add("RXCL", 1, [this](baseLib::BinaryStream& _stream, uint32_t)
+		_reader.add("RXCL", 2, [this](baseLib::BinaryStream& _stream, const uint32_t _version)
 		{
 			auto& controller = dynamic_cast<Controller&>(getController());
 			for(uint8_t aspect = 0; aspect < 3; ++aspect)
 				controller.setExcludeMask(static_cast<Controller::RandomizeAspect>(aspect), _stream.read<uint16_t>());
+			if(_version >= 2)
+				controller.setTrigChancePercent(_stream.read<uint8_t>());
 		});
 	}
 

@@ -108,15 +108,19 @@ int main()
 			controller.setExcludeMask(Aspect::Trigs, 0x0005);
 			controller.setExcludeMask(Aspect::Machines, 0x8000);
 			controller.setExcludeMask(Aspect::Locks, 0x0f0f);
+			controller.setTrigChancePercent(23);
 			juce::MemoryBlock state;
 			harness.audioProcessor.getStateInformation(state);
 			controller.setExcludeMask(Aspect::Trigs, 0); controller.setExcludeMask(Aspect::Machines, 0); controller.setExcludeMask(Aspect::Locks, 0);
+			controller.setTrigChancePercent(50);
 			harness.audioProcessor.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
 			pump(50);
 			std::printf("exclusions after state reload: %04x %04x %04x\n", controller.getExcludeMask(Aspect::Trigs),
 				controller.getExcludeMask(Aspect::Machines), controller.getExcludeMask(Aspect::Locks));
 			require(controller.getExcludeMask(Aspect::Trigs) == 0x0005 && controller.getExcludeMask(Aspect::Machines) == 0x8000
 				&& controller.getExcludeMask(Aspect::Locks) == 0x0f0f, "randomize exclusions did not survive state reload");
+			std::printf("trig chance after state reload: %d\n", controller.getTrigChancePercent());
+			require(controller.getTrigChancePercent() == 23, "trig chance did not survive state reload");
 		}
 		std::printf("track models: ");
 		for(uint8_t t = 0; t < 16; ++t) std::printf("%x ", controller.getTrackModel(t));

@@ -1268,7 +1268,7 @@ namespace mdJucePlugin
 
 		const auto randomTrigs = [&](const uint8_t _track)
 		{
-			std::bernoulli_distribution hit(static_cast<double>(m_trigChancePercent) / 100.0);
+			std::bernoulli_distribution hit(static_cast<double>(m_controller.getTrigChancePercent()) / 100.0);
 			uint64_t trigs = 0;
 			for(size_t step = 0; step < steps; ++step)
 				if(hit(m_random))
@@ -2252,7 +2252,6 @@ namespace mdJucePlugin
 		m_scale = static_cast<uint8_t>(std::clamp(config.getIntValue(g_scaleConfigKey, 0), 0,
 			static_cast<int>(md::scale::g_scaleCount) - 1));
 		m_scaleRoot = static_cast<uint8_t>(std::clamp(config.getIntValue(g_scaleRootConfigKey, 0), 0, 11));
-		m_trigChancePercent = std::clamp(config.getIntValue(g_trigChanceConfigKey, g_trigChanceDefault), 1, 99);
 	}
 
 	std::optional<Editor::ScaleContext> Editor::scaleContextForTrack(const uint8_t _track) const

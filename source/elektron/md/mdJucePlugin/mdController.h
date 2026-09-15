@@ -6,6 +6,7 @@
 #include "mdLib/mdtypes.h"
 #include "mdRealtimeQueue.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <deque>
@@ -106,6 +107,13 @@ namespace mdJucePlugin
 		void setExcludeMask(const RandomizeAspect _aspect, const uint16_t _mask)
 		{
 			m_randomizeExclude[static_cast<size_t>(_aspect)].store(_mask, std::memory_order_release);
+		}
+		// Chance (1..99 %) that a step receives a trig; per instance, saved with the state.
+		static constexpr int g_trigChanceDefault = 50;
+		int getTrigChancePercent() const { return m_trigChancePercent.load(std::memory_order_acquire); }
+		void setTrigChancePercent(const int _percent)
+		{
+			m_trigChancePercent.store(std::clamp(_percent, 1, 99), std::memory_order_release);
 		}
 		// Kit-dump machine model word for a Machinedrum track, 0xffffffff when
 		// no kit dump has been seen yet (see md::scale::tuningForModel).
@@ -239,6 +247,7 @@ namespace mdJucePlugin
 		std::atomic<bool> m_patternDumpPending{false};
 		std::array<std::atomic<uint32_t>, 16> m_trackModels;
 		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
+		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)

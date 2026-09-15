@@ -94,8 +94,7 @@ namespace mdJucePlugin
 		static constexpr const char* g_scaleRootConfigKey = "mdScaleRoot";
 		void applyScaleQuantizer();	// also re-reads the randomization settings
 		Controller& getMdController() { return m_controller; }
-		static constexpr const char* g_trigChanceConfigKey = "mdRandomTrigChancePercent";
-		static constexpr int g_trigChanceDefault = 50;
+
 
 	private:
 		friend struct EditorIdentityTestAccess;
@@ -303,7 +302,7 @@ namespace mdJucePlugin
 		std::optional<PendingRandomize> m_pendingRandomize;
 		uint8_t m_scale = 0;
 		uint8_t m_scaleRoot = 0;
-		int m_trigChancePercent = g_trigChanceDefault;
+
 		std::mt19937 m_random{std::random_device{}()};
 		std::shared_ptr<void> m_lifetimeToken = std::make_shared<int>(0);
 	};

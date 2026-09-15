@@ -53,15 +53,15 @@ namespace mdJucePlugin
 		auto* const label = juceRmlUi::helper::findChild(_root, "labelTrigChance", false);
 		if(!slider || !label)
 			return;
-		auto& config = m_processor.getConfig();
+		auto& controller = m_editor.getMdController();
 		const auto show = [label](const int _percent)
 		{
 			label->SetInnerRML(Rml::StringUtilities::EncodeRml(std::to_string(_percent) + " %"));
 		};
-		const auto current = std::clamp(config.getIntValue(Editor::g_trigChanceConfigKey, Editor::g_trigChanceDefault), 1, 99);
+		const auto current = controller.getTrigChancePercent();
 		slider->SetAttribute("value", std::to_string(current));
 		show(current);
-		juceRmlUi::EventListener::Add(slider, Rml::EventId::Change, [this, slider, &config, show](Rml::Event& _event)
+		juceRmlUi::EventListener::Add(slider, Rml::EventId::Change, [slider, &controller, show](Rml::Event& _event)
 		{
 			_event.StopPropagation();
 			const auto* const value = slider->GetAttribute("value");
@@ -69,19 +69,15 @@ namespace mdJucePlugin
 				return;
 			const auto percent = std::clamp(static_cast<int>(std::lround(
 				value->Get<float>(slider->GetCoreInstance()))), 1, 99);
-			config.setValue(Editor::g_trigChanceConfigKey, percent);
-			config.saveIfNeeded();
+			controller.setTrigChancePercent(percent);
 			show(percent);
-			m_editor.applyScaleQuantizer();
 		});
-		juceRmlUi::EventListener::Add(slider, Rml::EventId::Dblclick, [this, slider, &config, show](Rml::Event& _event)
+		juceRmlUi::EventListener::Add(slider, Rml::EventId::Dblclick, [slider, &controller, show](Rml::Event& _event)
 		{
 			_event.StopPropagation();
-			slider->SetAttribute("value", std::to_string(Editor::g_trigChanceDefault));
-			config.setValue(Editor::g_trigChanceConfigKey, Editor::g_trigChanceDefault);
-			config.saveIfNeeded();
-			show(Editor::g_trigChanceDefault);
-			m_editor.applyScaleQuantizer();
+			slider->SetAttribute("value", std::to_string(Controller::g_trigChanceDefault));
+			controller.setTrigChancePercent(Controller::g_trigChanceDefault);
+			show(Controller::g_trigChanceDefault);
 		});
 	}
 }
