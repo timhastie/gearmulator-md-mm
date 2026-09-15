@@ -155,6 +155,30 @@ namespace
 			filename.c_str(), image.size());
 		return image;
 	}
+
+	// Apply a persisted MIDI-upgraded OS image on top of whatever flash the
+	// machine would otherwise boot: the UW factory cache image or stock ROM
+	// bytes. Only the OS region is taken so cached factory sample flash and
+	// user data stay intact. Without this, a UW ROM (which always has a
+	// factory cache) silently booted stock firmware after an upgrade.
+	void applyOsUpgradeImage(std::vector<uint8_t>& _flash,
+		const std::vector<uint8_t>& _romData, const std::string& _romName,
+		const md::MachineModel _model, const std::string& _homePath)
+	{
+		auto image = loadInitialOsImage(_romData, _romName, _model, _homePath);
+		if(image.empty())
+			return;
+		if(_flash.empty())
+		{
+			_flash = std::move(image);
+			return;
+		}
+		if(_flash.size() != image.size() || g_osUpgradeRegionEnd > _flash.size())
+			return;
+		std::copy(image.begin() + g_osUpgradeRegionBegin,
+			image.begin() + g_osUpgradeRegionEnd,
+			_flash.begin() + g_osUpgradeRegionBegin);
+	}
 }
 
 namespace md
@@ -169,13 +193,10 @@ namespace md
 		, m_sysexDeviceId(g_sysexDeviceIds.fetch_add(1, std::memory_order_relaxed) + 1)
 	{
 		auto initialFlash = loadInitialMdFlash(_params, m_model);
-		if(initialFlash.flash.empty())
-		{
-			// No factory cache: boot a previously MIDI-upgraded OS image for
-			// this ROM when one was persisted, stock ROM bytes otherwise.
-			initialFlash.flash = loadInitialOsImage(_params.romData,
-				_params.romName, m_model, _params.homePath);
-		}
+		// Boot a previously MIDI-upgraded OS image for this ROM when one was
+		// persisted, layered over the factory cache image if there is one.
+		applyOsUpgradeImage(initialFlash.flash, _params.romData,
+			_params.romName, m_model, _params.homePath);
 		m_hardware = std::make_unique<Hardware>(_params.romData, _params.romName, m_model,
 			loadInitialPatchRam(_params, m_model, _initialPatchRam), m_frontPanelPublisher,
 			initialFlash.flash, initialFlash.cache);
@@ -549,13 +570,13 @@ namespace md
 			}
 			else if(!factory.flash.empty())
 				initialFlash = factory.flash;
-			else
-			{
-				// No factory image and no project overlay: boot a previously
-				// MIDI-upgraded OS image for this ROM when one was persisted.
-				initialFlash = loadInitialOsImage(_context->m_romData,
+			// Boot a previously MIDI-upgraded OS image for this ROM when one was
+			// persisted, layered over the factory/project image. A partial
+			// project overlay still pending (no factory image) keeps the stock
+			// path so the overlay is applied against the ROM it was saved from.
+			if(!initialFlash.empty() || !containsFlash)
+				applyOsUpgradeImage(initialFlash, _context->m_romData,
 					_context->m_romName, _context->m_model, _context->m_homePath);
-			}
 
 		auto replacement = std::make_unique<Hardware>(
 			_context->m_romData, _context->m_romName, _context->m_model, patchRam,
