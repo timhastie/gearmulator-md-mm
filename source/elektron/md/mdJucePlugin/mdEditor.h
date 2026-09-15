@@ -137,6 +137,7 @@ namespace mdJucePlugin
 		void beginPatternRandomize(RandomizeKind _kind, std::optional<uint8_t> _param);
 		void onPatternDumpReceived(std::vector<uint8_t> _dump);
 		void randomizePageParameters();
+		void randomizeTrackMachine(uint8_t _track);
 		void servicePendingRandomize(double _nowMilliseconds);
 		std::optional<uint8_t> selectedMachinedrumTrack() const;
 		std::optional<uint8_t> activeMachinedrumPage() const;

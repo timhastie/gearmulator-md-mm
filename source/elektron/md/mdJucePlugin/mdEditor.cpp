@@ -655,6 +655,12 @@ namespace mdJucePlugin
 					? RandomizeKind::PageLocks : RandomizeKind::Trigs, std::nullopt);
 		}
 
+		// BANK GROUP held + trig key: assign a random machine to that track.
+		if(getModel() == md::MachineModel::Machinedrum && isTrigger(_control)
+			&& isPanelControlHeld(md::PanelControl::BankGroup))
+			return randomizeTrackMachine(static_cast<uint8_t>(
+				static_cast<int>(_control) - static_cast<int>(md::PanelControl::Trigger1)));
+
 		// A missing native key-up must never let an earlier hold leak into a new,
 		// unmodified click before the timer fail-safe gets its next turn.
 		if(!_shiftDown && !m_shiftPanelLatch.empty())
@@ -1129,6 +1135,30 @@ namespace mdJucePlugin
 				parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
 					pluginLib::Parameter::Origin::Ui);
 		}
+	}
+
+	void Editor::randomizeTrackMachine(const uint8_t _track)
+	{
+		// Synthesis machines only: GND (no silent "---"), TRX, EFM, E12, P-I.
+		// ROM/RAM, input, MIDI and control machines are skipped.
+		static constexpr uint8_t models[] =
+		{
+			1, 2, 3, 4, 5,
+			16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+			32, 33, 34, 35, 36, 37, 38, 39,
+			48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63,
+			64, 65, 66, 67, 68, 69, 70, 71, 72,
+		};
+		const auto current = m_controller.getTrackModel(_track) & 0xffff;
+		uint8_t model = current & 0x7f;
+		for(int attempt = 0; attempt < 8 && model == (current & 0x7f); ++attempt)
+			model = models[std::uniform_int_distribution<size_t>(0, std::size(models) - 1)(m_random)];
+		// Elektron ASSIGN MACHINE (0x5b): track, model, UW flag, init/tonal flag.
+		const std::vector<uint8_t> message = {0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x5b,
+			static_cast<uint8_t>(_track & 0x0f), model, 0x00, 0x01, 0xf7};
+		m_controller.diagnostic("randomize machine: track " + std::to_string(_track + 1)
+			+ " model " + std::to_string(model));
+		m_controller.sendSysexToDevice(message);
 	}
 
 	void Editor::beginPatternRandomize(const RandomizeKind _kind, const std::optional<uint8_t> _param)
