@@ -593,27 +593,6 @@ namespace mdJucePlugin
 						&& !m_shiftPanelLatch.empty())
 						releasePanelButtonGestures();
 				});
-			juceRmlUi::EventListener::Add(document, Rml::EventId::Keydown,
-				[this](Rml::Event& _event)
-				{
-					// Randomize gestures. Keyboard arrows never reach the panel, so
-					// these cannot collide with a firmware key combination.
-					if(getModel() != md::MachineModel::Machinedrum)
-						return;
-					const auto key = juceRmlUi::helper::getKeyIdentifier(_event);
-					if(key != Rml::Input::KI_UP && key != Rml::Input::KI_DOWN)
-						return;
-					const auto shift = juceRmlUi::helper::getKeyModShift(_event);
-					if(key == Rml::Input::KI_UP && isPanelControlHeld(md::PanelControl::Enter))
-						randomizePageParameters();
-					else if(key == Rml::Input::KI_UP && shift)
-						beginPatternRandomize(RandomizeKind::Trigs, std::nullopt);
-					else if(key == Rml::Input::KI_DOWN && shift)
-						beginPatternRandomize(RandomizeKind::PageLocks, std::nullopt);
-					else
-						return;
-					_event.StopPropagation();
-				});
 			m_controller.setPatternDumpListener(
 				[this, token = std::weak_ptr<void>(m_lifetimeToken)](const std::vector<uint8_t>& _dump)
 				{
@@ -659,6 +638,21 @@ namespace mdJucePlugin
 	{
 		if(!_button || _button->isChecked())
 			return;
+
+		// Randomize chords (Machinedrum): FUNCTION held (Shift-click latches it)
+		// + UP / DOWN, or YES held + UP. The chord is consumed here, so the
+		// firmware only ever sees the held modifier button.
+		if(getModel() == md::MachineModel::Machinedrum
+			&& (_control == md::PanelControl::Up || _control == md::PanelControl::Down))
+		{
+			const auto functionHeld = isPanelControlHeld(md::PanelControl::Function);
+			const auto yesHeld = isPanelControlHeld(md::PanelControl::Enter);
+			if(_control == md::PanelControl::Up && yesHeld)
+				return randomizePageParameters();
+			if(functionHeld)
+				return beginPatternRandomize(_control == md::PanelControl::Up
+					? RandomizeKind::Trigs : RandomizeKind::PageLocks, std::nullopt);
+		}
 
 		// A missing native key-up must never let an earlier hold leak into a new,
 		// unmodified click before the timer fail-safe gets its next turn.
@@ -1077,6 +1071,8 @@ namespace mdJucePlugin
 
 	bool Editor::isPanelControlHeld(const md::PanelControl _control) const
 	{
+		if(m_shiftPanelLatch.contains(_control))
+			return true;
 		const auto packet = md::panelPacket(getModel(), _control);
 		if(!packet)
 			return false;
