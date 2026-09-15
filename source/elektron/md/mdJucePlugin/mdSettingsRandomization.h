@@ -14,7 +14,7 @@ namespace mdJucePlugin
 		SettingsRandomization(Editor& _editor, jucePluginEditorLib::Processor& _processor)
 			: SettingsPlugin(_processor), m_editor(_editor) {}
 		std::string getCategoryName() const override { return "RANDOMIZATION"; }
-		std::string getTemplateName() const override { return "tus_settings_randomization_Machinedrum"; }
+		std::string getTemplateName() const override;
 		void createUi(Rml::Element* _root) override;
 
 	private:

@@ -13,7 +13,7 @@ namespace mdJucePlugin
 		SettingsScale(Editor& _editor, jucePluginEditorLib::Processor& _processor)
 			: SettingsPlugin(_processor), m_editor(_editor) {}
 		std::string getCategoryName() const override { return "SCALE"; }
-		std::string getTemplateName() const override { return "tus_settings_scale_Machinedrum"; }
+		std::string getTemplateName() const override;
 		void createUi(Rml::Element* _root) override;
 
 	private:

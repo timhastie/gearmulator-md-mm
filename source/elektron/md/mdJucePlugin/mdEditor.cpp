@@ -21,6 +21,7 @@
 #include "mdLib/mdmidiprotocol.h"
 #include "mdLib/mdpanel.h"
 #include "mdLib/mdpatterndump.h"
+#include "mdLib/mmpatterndump.h"
 #include "mdLib/mdromloader.h"
 #include "mdLib/mdstate.h"
 
@@ -658,31 +659,56 @@ namespace mdJucePlugin
 					? RandomizeKind::PageLocks : RandomizeKind::Trigs, std::nullopt);
 		}
 
-		// Whole-pattern chords: FUNCTION + BANK GROUP (trigs on every track),
-		// FUNCTION + CLASSIC/EXTENDED (locks on every trig of every track),
-		// BANK GROUP + NO (random machine on every track), BANK GROUP + YES (all three).
-		if(getModel() == md::MachineModel::Machinedrum)
+		// Randomize chords. The chord is consumed here, so the firmware only ever
+		// sees the held modifier button.
 		{
 			const auto functionHeld = isPanelControlHeld(md::PanelControl::Function);
-			const auto bankGroupHeld = isPanelControlHeld(md::PanelControl::BankGroup);
-			if(_control == md::PanelControl::BankGroup && functionHeld)
-				return beginPatternRandomize(RandomizeKind::AllTrigs, std::nullopt);
-			if(_control == md::PanelControl::ClassicExtended && functionHeld)
-				return beginPatternRandomize(RandomizeKind::AllLocks, std::nullopt);
-			if(_control == md::PanelControl::Exit && bankGroupHeld)
-				return randomizeAllMachines();
-			if(_control == md::PanelControl::Enter && bankGroupHeld)
+			const auto bankHeld = isPanelControlHeld(md::PanelControl::BankGroup);
+			const auto yesHeld = isPanelControlHeld(md::PanelControl::Enter);
+			const bool mm = getModel() == md::MachineModel::Monomachine;
+			// Both machines: FUNCTION + UP/DOWN, YES + UP.
+			if(_control == md::PanelControl::Up && yesHeld)
+				return randomizePageParameters();
+			if(functionHeld && (_control == md::PanelControl::Up || _control == md::PanelControl::Down))
+				return beginPatternRandomize(_control == md::PanelControl::Up
+					? RandomizeKind::PageLocks : RandomizeKind::Trigs, std::nullopt);
+			if(!mm)
 			{
-				randomizeAllMachines();
-				return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
+				// MD: FUNCTION + BANK GROUP, FUNCTION + CLASSIC/EXTENDED, BANK GROUP + NO/YES, BANK GROUP + trig.
+				if(_control == md::PanelControl::BankGroup && functionHeld)
+					return beginPatternRandomize(RandomizeKind::AllTrigs, std::nullopt);
+				if(_control == md::PanelControl::ClassicExtended && functionHeld)
+					return beginPatternRandomize(RandomizeKind::AllLocks, std::nullopt);
+				if(_control == md::PanelControl::Exit && bankHeld)
+					return randomizeAllMachines();
+				if(_control == md::PanelControl::Enter && bankHeld)
+				{
+					randomizeAllMachines();
+					return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
+				}
+				if(isTrigger(_control) && bankHeld)
+					return randomizeTrackMachine(static_cast<uint8_t>(
+						static_cast<int>(_control) - static_cast<int>(md::PanelControl::Trigger1)));
+			}
+			else
+			{
+				// MM: BANK + ARP / TRANSP / SWING / SLIDE (the BankA-D keys), BANK + track key.
+				if(bankHeld && _control == md::PanelControl::BankA)
+					return beginPatternRandomize(RandomizeKind::AllTrigs, std::nullopt);
+				if(bankHeld && _control == md::PanelControl::BankB)
+					return beginPatternRandomize(RandomizeKind::AllLocks, std::nullopt);
+				if(bankHeld && _control == md::PanelControl::BankC)
+					return randomizeAllMachines();
+				if(bankHeld && _control == md::PanelControl::BankD)
+				{
+					randomizeAllMachines();
+					return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
+				}
+				if(bankHeld && _control >= md::PanelControl::Track1 && _control <= md::PanelControl::Track6)
+					return randomizeTrackMachine(static_cast<uint8_t>(
+						static_cast<int>(_control) - static_cast<int>(md::PanelControl::Track1)));
 			}
 		}
-
-		// BANK GROUP held + trig key: assign a random machine to that track.
-		if(getModel() == md::MachineModel::Machinedrum && isTrigger(_control)
-			&& isPanelControlHeld(md::PanelControl::BankGroup))
-			return randomizeTrackMachine(static_cast<uint8_t>(
-				static_cast<int>(_control) - static_cast<int>(md::PanelControl::Trigger1)));
 
 		// A missing native key-up must never let an earlier hold leak into a new,
 		// unmodified click before the timer fail-safe gets its next turn.
@@ -1114,6 +1140,27 @@ namespace mdJucePlugin
 	{
 		if(!m_frontPanelSnapshotValid)
 			return std::nullopt;
+		if(getModel() == md::MachineModel::Monomachine)
+		{
+			// Bicolor track LEDs; the selected track is lit red, muted/other states green.
+			const struct { uint8_t greenBank, greenBit, redBank, redBit; } tracks[] =
+			{
+				{ 0x25, 0, 0x25, 1 }, { 0x25, 2, 0x25, 3 },
+				{ 0x24, 0, 0x24, 1 }, { 0x24, 2, 0x24, 3 },
+				{ 0x24, 4, 0x24, 5 }, { 0x24, 6, 0x24, 7 },
+			};
+			const auto lit = [this](const uint8_t _bank, const uint8_t _bit)
+			{
+				return ((m_frontPanelSnapshot.getLedBankRaw(_bank) >> _bit) & 1u) == 0;
+			};
+			for(uint8_t i = 0; i < 6; ++i)
+				if(lit(tracks[i].redBank, tracks[i].redBit))
+					return i;
+			for(uint8_t i = 0; i < 6; ++i)
+				if(lit(tracks[i].greenBank, tracks[i].greenBit))
+					return i;
+			return std::nullopt;
+		}
 		for(uint32_t i = 0; i < 16; ++i)
 			if(m_frontPanelSnapshot.getDrumLed(i))
 				return static_cast<uint8_t>(i);
@@ -1124,6 +1171,21 @@ namespace mdJucePlugin
 	{
 		if(!m_frontPanelSnapshotValid)
 			return std::nullopt;
+		if(getModel() == md::MachineModel::Monomachine)
+		{
+			constexpr uint8_t banks[] = { 0x25, 0x25, 0x25, 0x25, 0x26, 0x26, 0x26 };
+			constexpr uint8_t bits[] = { 4, 5, 6, 7, 0, 1, 2 };
+			std::optional<uint8_t> active;
+			for(uint8_t page = 0; page < 7; ++page)
+			{
+				if((m_frontPanelSnapshot.getLedBankRaw(banks[page]) >> bits[page] & 1u) != 0)
+					continue;
+				if(active)
+					return std::nullopt;
+				active = page;
+			}
+			return active;
+		}
 		constexpr md::FrontPanel::StatusLed pages[] =
 		{
 			md::FrontPanel::StatusLed::Synthesis,
@@ -1165,6 +1227,23 @@ namespace mdJucePlugin
 	{
 		if(m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, _track))
 			return m_controller.diagnostic("randomize machine: track " + std::to_string(_track + 1) + " excluded");
+		if(getModel() == md::MachineModel::Monomachine)
+		{
+			// Synth machines only: GND SIN/NOIS, SID, SWAVE SAW/PULS/ENS, FM STAT/PAR/DYN, VO-6.
+			// FX machines (they process neighbours) and DigiPRO (needs waveforms) are skipped.
+			static constexpr uint8_t models[] = { 1, 2, 3, 4, 5, 14, 8, 9, 10, 11 };
+			const auto current = m_controller.getTrackModel(_track) & 0xff;
+			uint8_t model = static_cast<uint8_t>(current);
+			for(int attempt = 0; attempt < 8 && model == current; ++attempt)
+				model = models[std::uniform_int_distribution<size_t>(0, std::size(models) - 1)(m_random)];
+			// Elektron LOAD MACHINE (0x5b): track, model, 0x01 = initialise all parameters.
+			const std::vector<uint8_t> message = {0xf0, 0x00, 0x20, 0x3c, 0x03, 0x00, 0x5b,
+				static_cast<uint8_t>(_track & 0x07), model, 0x01, 0xf7};
+			m_controller.diagnostic("randomize machine: track " + std::to_string(_track + 1)
+				+ " model " + std::to_string(model));
+			m_controller.sendSysexToDevice(message);
+			return;
+		}
 		// Synthesis machines only: GND (no silent "---"), TRX, EFM, E12, P-I.
 		// ROM/RAM, input, MIDI and control machines are skipped.
 		static constexpr uint8_t models[] =
@@ -1189,17 +1268,14 @@ namespace mdJucePlugin
 
 	void Editor::randomizeAllMachines()
 	{
-		for(uint8_t track = 0; track < 16; ++track)
+		for(uint8_t track = 0; track < trackCount(); ++track)
 			randomizeTrackMachine(track);
 	}
 
 	void Editor::registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins)
 	{
-		if(getModel() == md::MachineModel::Machinedrum)
-		{
-			_plugins.push_back(std::make_unique<SettingsScale>(*this, getProcessor()));
-			_plugins.push_back(std::make_unique<SettingsRandomization>(*this, getProcessor()));
-		}
+		_plugins.push_back(std::make_unique<SettingsScale>(*this, getProcessor()));
+		_plugins.push_back(std::make_unique<SettingsRandomization>(*this, getProcessor()));
 		jucePluginEditorLib::Editor::registerSettings(_plugins);
 	}
 
@@ -1227,7 +1303,8 @@ namespace mdJucePlugin
 		{
 			const auto active = activeMachinedrumPage();
 			if(!active)
-				return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
+				return showRandomizeMessage(getModel() == md::MachineModel::Monomachine
+					? "Select a single parameter page first." : "Select the SYNTHESIS, EFFECTS or ROUTING page first.");
 			page = *active;
 		}
 		m_pendingRandomize = PendingRandomize{_kind, *track, page, _param.value_or(0),
@@ -1254,6 +1331,8 @@ namespace mdJucePlugin
 			return;
 		const auto pending = *m_pendingRandomize;
 		m_pendingRandomize.reset();
+		if(getModel() == md::MachineModel::Monomachine)
+			return onMonomachinePatternDump(_dump, pending);
 
 		std::string error;
 		auto pattern = md::patternDump::decode(_dump, &error);
@@ -1378,6 +1457,117 @@ namespace mdJucePlugin
 		const auto encoded = md::patternDump::encode(*pattern);
 		m_controller.diagnostic("randomize: sending pattern " + std::to_string(pattern->position) + " ("
 			+ std::to_string(encoded.size()) + " bytes, " + std::to_string(pattern->rows.size()) + " lock rows)");
+		m_controller.sendSysexToDevice(encoded);
+	}
+
+	void Editor::onMonomachinePatternDump(const std::vector<uint8_t>& _dump, const PendingRandomize& _pending)
+	{
+		using namespace md::mmPatternDump;
+		std::string error;
+		auto pattern = decode(_dump, &error);
+		m_controller.diagnostic("randomize: MM dump version " + std::to_string(_dump.size() > 7 ? _dump[7] : 0)
+			+ ", " + std::to_string(_dump.size()) + " bytes, " + (pattern ? "decoded" : error));
+		if(!pattern)
+			return showRandomizeMessage("Could not decode the pattern dump: " + error);
+
+		const auto steps = pattern->stepCount();
+		const uint64_t stepMask = steps >= 64 ? ~0ull : (1ull << steps) - 1;
+		using Aspect = Controller::RandomizeAspect;
+
+		const auto randomTrigs = [&](const uint8_t _track)
+		{
+			std::bernoulli_distribution hit(static_cast<double>(m_controller.getTrigChancePercent()) / 100.0);
+			uint64_t trigs = 0;
+			for(size_t step = 0; step < steps; ++step)
+				if(hit(m_random))
+					trigs |= 1ull << step;
+			pattern->setTrigs(_track, trigs);
+			for(size_t step = 0; step < steps; ++step)
+				if(trigs >> step & 1u)
+					pattern->setNote(_track, static_cast<uint8_t>(step), randomNote());
+		};
+		const auto lockTrack = [&](const uint8_t _track, const std::vector<uint8_t>& _params) -> bool
+		{
+			const auto trigs = pattern->trigs(_track) & stepMask;
+			for(const auto param : _params)
+				for(size_t step = 0; step < steps; ++step)
+					if((trigs >> step & 1u) && !pattern->setLock(_track, param, static_cast<uint8_t>(step),
+						randomParameterValue(_track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8))))
+						return false;
+			return true;
+		};
+
+		switch(_pending.kind)
+		{
+		case RandomizeKind::Trigs:
+			randomTrigs(_pending.track);
+			break;
+		case RandomizeKind::PageLocks:
+		case RandomizeKind::ParamLocks:
+		{
+			if((pattern->trigs(_pending.track) & stepMask) == 0)
+				return showRandomizeMessage("The selected track has no trigs to lock.");
+			std::vector<uint8_t> params;
+			if(_pending.kind == RandomizeKind::ParamLocks)
+				params.push_back(static_cast<uint8_t>(_pending.page * 8 + _pending.param));
+			else
+				for(uint8_t i = 0; i < 8; ++i)
+					params.push_back(static_cast<uint8_t>(_pending.page * 8 + i));
+			if(!lockTrack(_pending.track, params))
+				return showRandomizeMessage("This pattern already uses the maximum of 62 parameter-lock rows.");
+			break;
+		}
+		case RandomizeKind::QuantizeLocks:
+		{
+			if(m_scale == 0)
+				return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
+			const auto trigs = pattern->trigs(_pending.track) & stepMask;
+			if(trigs == 0)
+				return showRandomizeMessage("The selected track has no trigs whose notes could be quantized.");
+			for(size_t step = 0; step < steps; ++step)
+				if(trigs >> step & 1u)
+					pattern->setNote(_pending.track, static_cast<uint8_t>(step),
+						snapNote(pattern->note(_pending.track, static_cast<uint8_t>(step))));
+			break;
+		}
+		case RandomizeKind::AllTrigs:
+		case RandomizeKind::AllLocks:
+		case RandomizeKind::Everything:
+		{
+			if(_pending.kind != RandomizeKind::AllLocks)
+				for(uint8_t t = 0; t < g_tracks; ++t)
+					if(!m_controller.isTrackExcluded(Aspect::Trigs, t))
+						randomTrigs(t);
+			if(_pending.kind != RandomizeKind::AllTrigs)
+			{
+				std::vector<uint8_t> tracks;
+				for(uint8_t t = 0; t < g_tracks; ++t)
+				{
+					if(m_controller.isTrackExcluded(Aspect::Locks, t))
+						continue;
+					pattern->clearTrackLocks(t);
+					if(pattern->trigs(t) & stepMask)
+						tracks.push_back(t);
+				}
+				const size_t budget = g_maxRows - std::min(pattern->rowCount(), g_maxRows);
+				const size_t perTrack = tracks.empty() ? 0 : std::min<size_t>(g_params, budget / tracks.size());
+				for(const auto t : tracks)
+				{
+					std::array<uint8_t, g_params> all{};
+					for(uint8_t i = 0; i < all.size(); ++i) all[i] = i;
+					std::shuffle(all.begin(), all.end(), m_random);
+					(void)lockTrack(t, std::vector<uint8_t>(all.begin(), all.begin() + static_cast<std::ptrdiff_t>(perTrack)));
+				}
+			}
+			break;
+		}
+		}
+
+		if(!m_controller.saveCurrentKit())
+			m_controller.diagnostic("randomize: current kit slot unknown, kit not saved before pattern send");
+		const auto encoded = encode(*pattern);
+		m_controller.diagnostic("randomize: sending MM pattern " + std::to_string(pattern->position) + " ("
+			+ std::to_string(encoded.size()) + " bytes, " + std::to_string(pattern->rowCount()) + " lock rows)");
 		m_controller.sendSysexToDevice(encoded);
 	}
 
@@ -2123,8 +2313,7 @@ namespace mdJucePlugin
 					// Randomize chords on encoders (Machinedrum): UP held + click =
 					// random locks for this parameter; FUNCTION held + click on A (PTCH)
 					// = snap the track's PTCH locks to the scale.
-					if(getModel() == md::MachineModel::Machinedrum
-						&& static_cast<uint8_t>(_encoder) < 8
+					if(static_cast<uint8_t>(_encoder) < 8
 						&& juceRmlUi::helper::getMouseButton(_event) == juceRmlUi::MouseButton::Left
 						&& !juceRmlUi::helper::getKeyModAlt(_event))
 					{
@@ -2139,7 +2328,9 @@ namespace mdJucePlugin
 							if(_encoder == md::PanelEncoder::DataEntryA)
 								beginPatternRandomize(RandomizeKind::QuantizeLocks, 0);
 							else
-								showRandomizeMessage("FUNCTION + encoder A (PTCH) snaps the track's PTCH locks to the scale.");
+								showRandomizeMessage(getModel() == md::MachineModel::Monomachine
+									? "FUNCTION + encoder A snaps the track's trig notes to the scale."
+									: "FUNCTION + encoder A (PTCH) snaps the track's PTCH locks to the scale.");
 							_event.StopPropagation();
 							return;
 						}
@@ -2273,9 +2464,41 @@ namespace mdJucePlugin
 		return false;
 	}
 
+	uint8_t Editor::randomNote()
+	{
+		// C3..B4 (48..71); in scale when one is set.
+		if(m_scale != 0)
+		{
+			std::vector<uint8_t> notes;
+			const auto mask = md::scale::scaleMask(m_scale);
+			for(uint8_t n = 48; n < 72; ++n)
+				if(mask >> ((n + 12 - m_scaleRoot) % 12) & 1u)
+					notes.push_back(n);
+			if(!notes.empty())
+				return notes[std::uniform_int_distribution<size_t>(0, notes.size() - 1)(m_random)];
+		}
+		return static_cast<uint8_t>(std::uniform_int_distribution<int>(48, 71)(m_random));
+	}
+
+	uint8_t Editor::snapNote(const uint8_t _note) const
+	{
+		if(m_scale == 0)
+			return _note;
+		const auto mask = md::scale::scaleMask(m_scale);
+		for(int distance = 0; distance < 12; ++distance)
+		{
+			const int down = static_cast<int>(_note) - distance, up = static_cast<int>(_note) + distance;
+			if(down >= 0 && (mask >> ((down + 12 * 12 - m_scaleRoot) % 12) & 1u))
+				return static_cast<uint8_t>(down);
+			if(up <= 127 && (mask >> ((up + 12 * 12 - m_scaleRoot) % 12) & 1u))
+				return static_cast<uint8_t>(up);
+		}
+		return _note;
+	}
+
 	uint8_t Editor::randomParameterValue(const uint8_t _track, const uint8_t _page, const uint8_t _index)
 	{
-		if(_page == 0 && _index == 0)
+		if(getModel() == md::MachineModel::Machinedrum && _page == 0 && _index == 0)
 			if(const auto context = scaleContextForTrack(_track))
 				return md::scale::random(context->tuning, context->mask, context->root, m_random);
 		return static_cast<uint8_t>(std::uniform_int_distribution<int>(0, 127)(m_random));

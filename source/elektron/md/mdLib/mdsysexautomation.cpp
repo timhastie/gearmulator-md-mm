@@ -302,6 +302,11 @@ namespace md::automation::sysex
 		}
 		KitDump dump{slot, std::move(result), {}};
 		dump.models.fill(0xffffffff);
+		// Machine models follow the 6 x 72 parameters (MCL MNMKit layout).
+		constexpr size_t modelPosition = parameterPosition + monomachine::TrackCount * parameterStride;
+		if(decoded->size() >= modelPosition + monomachine::TrackCount)
+			for(uint8_t track = 0; track < monomachine::TrackCount; ++track)
+				dump.models[track] = (*decoded)[modelPosition + track];
 		return dump;
 	}
 }

@@ -14,6 +14,11 @@
 
 namespace mdJucePlugin
 {
+	std::string SettingsScale::getTemplateName() const
+	{
+		return "tus_settings_scale_" + m_editor.getSettingsTemplateSuffix();
+	}
+
 	void SettingsScale::createUi(Rml::Element* _root)
 	{
 		auto& config = m_processor.getConfig();

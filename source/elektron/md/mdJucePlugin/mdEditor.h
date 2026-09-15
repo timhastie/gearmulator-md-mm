@@ -136,6 +136,14 @@ namespace mdJucePlugin
 		// Randomize gestures (Machinedrum only). Pattern edits round-trip the
 		// current pattern through a SysEx dump so the firmware owns the result.
 		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks, AllTrigs, AllLocks, Everything };
+		struct PendingRandomize
+		{
+			RandomizeKind kind;
+			uint8_t track;
+			uint8_t page;
+			uint8_t param;
+			double startedMilliseconds;
+		};
 		void beginPatternRandomize(RandomizeKind _kind, std::optional<uint8_t> _param);
 		void onPatternDumpReceived(std::vector<uint8_t> _dump);
 		void randomizePageParameters();
@@ -143,8 +151,12 @@ namespace mdJucePlugin
 		void randomizeAllMachines();
 		void registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins) override;
 		void servicePendingRandomize(double _nowMilliseconds);
-		std::optional<uint8_t> selectedMachinedrumTrack() const;
-		std::optional<uint8_t> activeMachinedrumPage() const;
+		std::optional<uint8_t> selectedMachinedrumTrack() const;	// model-aware despite the name
+		std::optional<uint8_t> activeMachinedrumPage() const;		// model-aware despite the name
+		uint8_t trackCount() const { return getModel() == md::MachineModel::Monomachine ? 6 : 16; }
+		uint8_t randomNote();
+		uint8_t snapNote(uint8_t _note) const;
+		void onMonomachinePatternDump(const std::vector<uint8_t>& _dump, const PendingRandomize& _pending);
 		bool isPanelControlHeld(md::PanelControl _control) const;
 		void showRandomizeMessage(const std::string& _message) const;
 		struct ScaleContext
@@ -291,14 +303,6 @@ namespace mdJucePlugin
 		size_t m_sysexReceivePromptStep = 0;
 		double m_sysexLastAdvanceMilliseconds = 0.0;
 		bool m_sysexStallWarningShown = false;
-		struct PendingRandomize
-		{
-			RandomizeKind kind;
-			uint8_t track;
-			uint8_t page;
-			uint8_t param;
-			double startedMilliseconds;
-		};
 		std::optional<PendingRandomize> m_pendingRandomize;
 		uint8_t m_scale = 0;
 		uint8_t m_scaleRoot = 0;

@@ -16,6 +16,11 @@
 
 namespace mdJucePlugin
 {
+	std::string SettingsRandomization::getTemplateName() const
+	{
+		return "tus_settings_randomization_" + m_editor.getSettingsTemplateSuffix();
+	}
+
 	void SettingsRandomization::createUi(Rml::Element* _root)
 	{
 		// Include/exclude grid: checked = included.

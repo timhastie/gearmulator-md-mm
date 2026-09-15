@@ -70,6 +70,8 @@ juce_add_binary_data(mdJucePlugin_BinaryData SOURCES
 	"tus_settings_dspaudio_Machinedrum.rml" ${MD_SKIN_ASSETS})
 juce_add_binary_data(mmJucePlugin_BinaryData SOURCES
 	${COMMON_ASSETS} "tus_settings_gui_Monomachine.rml"
+	"tus_settings_scale_Monomachine.rml"
+	"tus_settings_randomization_Monomachine.rml"
 	"tus_settings_dspaudio_Monomachine.rml" ${MM_SKIN_ASSETS})
 
 createJucePlugin(mdJucePlugin "Gearmulator MD" TRUE "Tmdr" mdJucePlugin_BinaryData mdLib)

@@ -4,6 +4,7 @@
 #include "mdLib/mdautomation.h"
 #include "mdLib/mddevice.h"
 #include "mdLib/mdpatterndump.h"
+#include "mdLib/mmpatterndump.h"
 #include "mdLib/mdsysexautomation.h"
 
 #include <algorithm>
@@ -897,8 +898,9 @@ namespace mdJucePlugin
 				if(m_patternDumpPending.exchange(false, std::memory_order_acq_rel))
 				{
 					diagnostic("pattern status " + std::to_string(status->value) + ", requesting dump");
-					sendSynchronizationRequest(toPluginSysex(
-						md::patternDump::request(status->value)));
+					sendSynchronizationRequest(toPluginSysex(m_model == md::MachineModel::Monomachine
+						? md::mmPatternDump::request(status->value)
+						: md::patternDump::request(status->value)));
 				}
 				return true;
 			}
@@ -934,9 +936,11 @@ namespace mdJucePlugin
 			&& _message[6] == md::patternDump::g_patternDump)
 		{
 			const std::vector<uint8_t> dump(_message.begin(), _message.end());
+			const bool valid = m_model == md::MachineModel::Monomachine
+				? md::mmPatternDump::isPatternDump(dump) : md::patternDump::isPatternDump(dump);
 			diagnostic("pattern dump received: " + std::to_string(dump.size()) + " bytes, valid="
-				+ std::to_string(md::patternDump::isPatternDump(dump)) + ", listener=" + std::to_string(m_patternDumpListener != nullptr));
-			if(md::patternDump::isPatternDump(dump))
+				+ std::to_string(valid) + ", listener=" + std::to_string(m_patternDumpListener != nullptr));
+			if(valid)
 			{
 				std::function<void(const std::vector<uint8_t>&)> listener;
 				{

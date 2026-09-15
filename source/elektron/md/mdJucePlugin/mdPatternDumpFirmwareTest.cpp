@@ -2,6 +2,7 @@
 // pattern, decode it, flip its trigs, send it back, and read it again.
 #include "mdAutomationTestSupport.h"
 #include "mdLib/mdpatterndump.h"
+#include "mdLib/mmpatterndump.h"
 #include "mdLib/mdpanel.h"
 
 #include <cstdio>
@@ -11,9 +12,11 @@ int main()
 	using namespace mdAutomationTest;
 	try
 	{
-		Harness harness(md::MachineModel::Machinedrum);
+		const auto model = std::getenv("MODEL") != nullptr && std::string(std::getenv("MODEL")) == "MM"
+			? md::MachineModel::Monomachine : md::MachineModel::Machinedrum;
+		Harness harness(model);
 		if(!harness.hasLocalFirmware())
-			return allowMissingFirmware("mdPatternDumpFirmwareTest", md::MachineModel::Machinedrum) ? 0 : SkipReturnCode;
+			return allowMissingFirmware("mdPatternDumpFirmwareTest", model) ? 0 : SkipReturnCode;
 		harness.prepare();
 		auto& controller = harness.controller;
 		// REALTIME=1 mimics a DAW: the host callback is realtime and the controller
@@ -37,6 +40,46 @@ int main()
 
 		std::vector<uint8_t> captured;
 		controller.setPatternDumpListener([&captured](const std::vector<uint8_t>& _dump) { captured = _dump; });
+
+		if(model == md::MachineModel::Monomachine)
+		{
+			auto fetchMM = [&]() -> std::optional<md::mmPatternDump::Pattern>
+			{
+				captured.clear();
+				controller.requestCurrentPatternDump();
+				for(int i = 0; i < 6000 && captured.empty(); ++i)
+					pump(1);
+				std::printf("MM pattern dump: %zu bytes%s\n", captured.size(), captured.empty() ? " (NO REPLY)" : "");
+				if(captured.empty())
+					return std::nullopt;
+				std::string error;
+				auto pattern = md::mmPatternDump::decode(captured, &error);
+				std::printf("decode: %s (version 0x%02x pos %u len %zu rows %zu)\n", pattern ? "ok" : error.c_str(),
+					captured[7], captured[9], pattern ? pattern->stepCount() : 0, pattern ? pattern->rowCount() : 0);
+				return pattern;
+			};
+			auto pattern = fetchMM();
+			require(pattern.has_value(), "no decodable MM pattern dump");
+			pattern->setTrigs(0, 0x9249ull);
+			pattern->setNote(0, 0, 60); pattern->setNote(0, 3, 67);
+			require(pattern->setLock(0, 0, 0, 100) && pattern->setLock(0, 9, 3, 40), "MM setLock failed");
+			const auto encoded = md::mmPatternDump::encode(*pattern);
+			std::printf("sending %zu bytes\n", encoded.size());
+			controller.sendSysexToDevice(encoded);
+			pump(400);
+			auto verify = fetchMM();
+			require(verify.has_value(), "no MM pattern dump after send");
+			std::printf("track 1 trigs 0x%llx notes %u %u, lock(0,0)@0=%u lock(0,9)@3=%u, rows %zu\n",
+				static_cast<unsigned long long>(verify->trigs(0)), verify->note(0, 0), verify->note(0, 3),
+				verify->hasLock(0, 0) ? verify->row(verify->rowIndex(0, 0))[0] : 255,
+				verify->hasLock(0, 9) ? verify->row(verify->rowIndex(0, 9))[3] : 255, verify->rowCount());
+			require(verify->trigs(0) == 0x9249ull && verify->note(0, 3) == 67, "MM firmware did not store trigs/notes");
+			require(verify->hasLock(0, 0) && verify->row(verify->rowIndex(0, 0))[0] == 100, "MM firmware did not store the lock");
+			std::printf("track models: ");
+			for(uint8_t t = 0; t < 6; ++t) std::printf("%x ", controller.getTrackModel(t));
+			std::printf("\nmdPatternDumpFirmwareTest (MM): PASS\n");
+			return 0;
+		}
 
 		auto fetch = [&]() -> std::optional<md::patternDump::Pattern>
 		{

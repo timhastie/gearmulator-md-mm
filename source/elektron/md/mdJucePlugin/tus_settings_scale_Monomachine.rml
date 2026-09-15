@@ -1,0 +1,22 @@
+<template name="tus_settings_scale_Monomachine">
+<head>
+</head>
+<body>
+	<div class="settings-page">
+		<h1>Scale Quantizer</h1>
+		<settingsspacer1/>
+		<label>With a scale on, every randomize gesture writes trig notes that belong to the scale, and FUNCTION + click on encoder A snaps the selected track's existing trig notes to the nearest scale note.</label>
+		<settingsspacer1/>
+		<div class="settings-hlayout">
+			<label>Scale</label>
+			<combo class="settings-combo" id="cbScaleQuantizer"/>
+		</div>
+		<settingsspacer1/>
+		<div class="settings-hlayout">
+			<label>Root</label>
+			<combo class="settings-combo" id="cbScaleRoot"/>
+		</div>
+		<settingsspacer1/>
+	</div>
+</body>
+</template>
