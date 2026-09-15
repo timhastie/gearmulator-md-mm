@@ -1238,8 +1238,9 @@ namespace mdJucePlugin
 					return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
 				if(model == 0xffffffffu)
 					return showRandomizeMessage("No kit dump has been received yet, so the track's machine is unknown. Try again in a moment.");
-				return showRandomizeMessage("This track's machine (model " + std::to_string(model & 0xffff)
-					+ ") has no pitched PTCH parameter.");
+				return showRandomizeMessage("No measured pitch table for this track's machine (model "
+					+ std::to_string(model & 0xffff) + "). Supported: GND SN/SW/PU, all TRX except CP/CB/CH/OH/CY/MA, "
+					"EFM RS/HH/CP/SD/XT/BD/CB/CY, E12 BC/CB/LT, ROM/RAM, and any track set to TONAL in the X firmware.");
 			}
 			if(!pattern->hasLock(track, 0))
 				return showRandomizeMessage("The selected track has no PTCH locks to quantize.");
