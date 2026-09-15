@@ -340,6 +340,14 @@ namespace mdJucePlugin
 		sendMidiEvent(event);
 	}
 
+	void Controller::diagnostic(const std::string& _message) const
+	{
+		std::fprintf(stderr, "[MD] %s\n", _message.c_str());
+		const auto file = juce::File(getProcessor().getDataFolder()).getChildFile("logs").getChildFile("randomize.log");
+		file.getParentDirectory().createDirectory();
+		file.appendText(juce::Time::getCurrentTime().toString(true, true, true, true) + "  " + _message + "\n");
+	}
+
 	void Controller::setPatternDumpListener(
 		std::function<void(const std::vector<uint8_t>&)> _listener)
 	{
@@ -350,6 +358,10 @@ namespace mdJucePlugin
 	void Controller::requestCurrentPatternDump()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		diagnostic("requesting current pattern (status query), automationReady="
+			+ std::to_string(isAutomationSynchronized()) + ", ingress drops contention="
+			+ std::to_string(getRealtimeMidiIngressContentionDropCount()) + " capacity="
+			+ std::to_string(getRealtimeMidiIngressCapacityDropCount()));
 		m_patternDumpPending.store(true, std::memory_order_release);
 		sendSynchronizationRequest(toPluginSysex(md::automation::sysex::statusRequest(
 			m_model, md::automation::sysex::StatusParameter::Pattern)));
@@ -813,6 +825,12 @@ namespace mdJucePlugin
 		const synthLib::MidiEventSource _source)
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_message.size() >= 9)
+			diagnostic("sysex from source " + std::to_string(static_cast<int>(_source)) + ": "
+				+ std::to_string(_message.size()) + " bytes, cmd=0x"
+				+ juce::String::toHexString(static_cast<int>(_message.size() > 6 ? _message[6] : 0)).toStdString()
+				+ " first=0x" + juce::String::toHexString(static_cast<int>(_message[0])).toStdString()
+				+ " last=0x" + juce::String::toHexString(static_cast<int>(_message.back())).toStdString());
 		if(const auto status = md::automation::sysex::parseStatusResponse(
 			m_model, _message))
 		{
@@ -869,7 +887,7 @@ namespace mdJucePlugin
 			case md::automation::sysex::StatusParameter::Pattern:
 				if(m_patternDumpPending.exchange(false, std::memory_order_acq_rel))
 				{
-					std::fprintf(stderr, "[MD] pattern status %u, requesting dump\n", status->value);
+					diagnostic("pattern status " + std::to_string(status->value) + ", requesting dump");
 					sendSynchronizationRequest(toPluginSysex(
 						md::patternDump::request(status->value)));
 				}
@@ -895,8 +913,8 @@ namespace mdJucePlugin
 			&& _message[6] == md::patternDump::g_patternDump)
 		{
 			const std::vector<uint8_t> dump(_message.begin(), _message.end());
-			std::fprintf(stderr, "[MD] pattern dump received: %zu bytes, valid=%d\n",
-				dump.size(), md::patternDump::isPatternDump(dump));
+			diagnostic("pattern dump received: " + std::to_string(dump.size()) + " bytes, valid="
+				+ std::to_string(md::patternDump::isPatternDump(dump)) + ", listener=" + std::to_string(m_patternDumpListener != nullptr));
 			if(md::patternDump::isPatternDump(dump))
 			{
 				std::function<void(const std::vector<uint8_t>&)> listener;

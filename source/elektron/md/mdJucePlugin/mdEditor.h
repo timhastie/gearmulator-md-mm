@@ -141,7 +141,7 @@ namespace mdJucePlugin
 		std::optional<uint8_t> selectedMachinedrumTrack() const;
 		std::optional<uint8_t> activeMachinedrumPage() const;
 		bool isPanelControlHeld(md::PanelControl _control) const;
-		static void showRandomizeMessage(const std::string& _message);
+		void showRandomizeMessage(const std::string& _message) const;
 		struct ScaleContext
 		{
 			md::scale::Tuning tuning;

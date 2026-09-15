@@ -2,6 +2,7 @@
 // pattern, decode it, flip its trigs, send it back, and read it again.
 #include "mdAutomationTestSupport.h"
 #include "mdLib/mdpatterndump.h"
+#include "mdLib/mdpanel.h"
 
 #include <cstdio>
 
@@ -14,8 +15,25 @@ int main()
 		if(!harness.hasLocalFirmware())
 			return allowMissingFirmware("mdPatternDumpFirmwareTest", md::MachineModel::Machinedrum) ? 0 : SkipReturnCode;
 		harness.prepare();
-		require(harness.synchronize(), "initial firmware synchronization timed out: " + harness.firmwareReadiness());
 		auto& controller = harness.controller;
+		// REALTIME=1 mimics a DAW: the host callback is realtime and the controller
+		// is drained separately, as its UI timer would.
+		const bool realtime = std::getenv("REALTIME") != nullptr;
+		if(realtime)
+			harness.audioProcessor.setNonRealtime(false);
+		auto pump = [&](const int _blocks)
+		{
+			for(int i = 0; i < _blocks; ++i)
+			{
+				harness.process(1);
+				if(realtime)
+					controller.processOfflineControllerWork();
+			}
+		};
+		bool synced = false;
+		for(int i = 0; i < 12000 && !synced; ++i) { pump(1); synced = controller.isAutomationSynchronized(); }
+		require(synced, "initial firmware synchronization timed out: " + harness.firmwareReadiness());
+		std::printf("mode: %s\n", realtime ? "realtime" : "offline");
 
 		std::vector<uint8_t> captured;
 		controller.setPatternDumpListener([&captured](const std::vector<uint8_t>& _dump) { captured = _dump; });
@@ -25,7 +43,7 @@ int main()
 			captured.clear();
 			controller.requestCurrentPatternDump();
 			for(int i = 0; i < 6000 && captured.empty(); ++i)
-				harness.process(1);
+				pump(1);
 			std::printf("pattern dump: %zu bytes%s\n", captured.size(),
 				captured.empty() ? " (NO REPLY)" : "");
 			if(captured.empty())
@@ -39,7 +57,34 @@ int main()
 			return pattern;
 		};
 
+		// HOLD_FUNCTION=1 keeps the FUNCTION key pressed while requesting, as the
+		// editor's FUNCTION+DOWN chord does when Shift is still held.
+		const bool holdFunction = std::getenv("HOLD_FUNCTION") != nullptr;
+		auto panel = [&](const uint8_t _row, const uint8_t _mask)
+		{
+			harness.processor.getPlugin().withDeviceLocked([&](synthLib::Device* const _device)
+			{
+				if(auto* const device = dynamic_cast<md::Device*>(_device))
+					device->sendPanelEvent(_row, _mask);
+			});
+		};
+		if(holdFunction)
+		{
+			const auto packet = md::panelPacket(md::MachineModel::Machinedrum, md::PanelControl::Function);
+			require(packet.has_value(), "no FUNCTION packet");
+			panel(packet->row, packet->mask);
+			pump(60);
+			std::printf("FUNCTION held (row 0x%02x mask 0x%02x)\n", packet->row, packet->mask);
+		}
 		auto pattern = fetch();
+		if(holdFunction)
+		{
+			const auto packet = md::panelPacket(md::MachineModel::Machinedrum, md::PanelControl::Function);
+			panel(packet->row, 0);
+			pump(60);
+			std::printf("FUNCTION released; retrying fetch\n");
+			if(!pattern) pattern = fetch();
+		}
 		require(pattern.has_value(), "no decodable pattern dump");
 		const uint64_t newTrigs = 0x9249ull;	// steps 1,4,7,10,13,16
 		pattern->trigs[0] = newTrigs;
@@ -47,7 +92,7 @@ int main()
 		const auto encoded = md::patternDump::encode(*pattern);
 		std::printf("sending %zu bytes\n", encoded.size());
 		controller.sendSysexToDevice(encoded);
-		harness.process(400);
+		pump(400);
 
 		auto verify = fetch();
 		require(verify.has_value(), "no pattern dump after send");

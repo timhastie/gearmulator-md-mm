@@ -1063,9 +1063,9 @@ namespace mdJucePlugin
 		getProcessor().addMidiEvent(event);
 	}
 
-	void Editor::showRandomizeMessage(const std::string& _message)
+	void Editor::showRandomizeMessage(const std::string& _message) const
 	{
-		std::fprintf(stderr, "[MD] randomize: %s\n", _message.c_str());
+		m_controller.diagnostic("randomize: " + _message);
 		genericUI::MessageBox::showOk(genericUI::MessageBox::Icon::Warning,
 			"Randomize", _message);
 	}
@@ -1148,6 +1148,8 @@ namespace mdJucePlugin
 		}
 		m_pendingRandomize = PendingRandomize{_kind, *track, page, _param.value_or(0),
 			juce::Time::getMillisecondCounterHiRes()};
+		m_controller.diagnostic("randomize gesture kind=" + std::to_string(static_cast<int>(_kind))
+			+ " track=" + std::to_string(*track) + " page=" + std::to_string(page));
 		m_controller.requestCurrentPatternDump();
 	}
 
@@ -1156,6 +1158,9 @@ namespace mdJucePlugin
 		if(!m_pendingRandomize || _nowMilliseconds - m_pendingRandomize->startedMilliseconds < 10000.0)
 			return;
 		m_pendingRandomize.reset();
+		m_controller.diagnostic("timeout: ingress drops contention="
+			+ std::to_string(m_controller.getRealtimeMidiIngressContentionDropCount()) + " capacity="
+			+ std::to_string(m_controller.getRealtimeMidiIngressCapacityDropCount()));
 		showRandomizeMessage("The machine did not answer the pattern request. Make sure it has finished booting and is not in a menu.");
 	}
 
@@ -1168,8 +1173,8 @@ namespace mdJucePlugin
 
 		std::string error;
 		auto pattern = md::patternDump::decode(_dump, &error);
-		std::fprintf(stderr, "[MD] randomize: pattern dump version 0x%02x, %zu bytes, %s\n",
-			_dump.size() > 7 ? _dump[7] : 0, _dump.size(), pattern ? "decoded" : error.c_str());
+		m_controller.diagnostic("randomize: dump version " + std::to_string(_dump.size() > 7 ? _dump[7] : 0)
+			+ ", " + std::to_string(_dump.size()) + " bytes, " + (pattern ? "decoded" : error));
 		if(!pattern)
 			return showRandomizeMessage("Could not decode the pattern dump: " + error);
 
@@ -1224,8 +1229,8 @@ namespace mdJucePlugin
 		}
 
 		const auto encoded = md::patternDump::encode(*pattern);
-		std::fprintf(stderr, "[MD] randomize: sending pattern %u (%zu bytes, %zu lock rows)\n",
-			pattern->position, encoded.size(), pattern->rows.size());
+		m_controller.diagnostic("randomize: sending pattern " + std::to_string(pattern->position) + " ("
+			+ std::to_string(encoded.size()) + " bytes, " + std::to_string(pattern->rows.size()) + " lock rows)");
 		m_controller.sendSysexToDevice(encoded);
 	}
 
