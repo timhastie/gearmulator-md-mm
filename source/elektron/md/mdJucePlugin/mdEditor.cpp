@@ -2115,14 +2115,23 @@ namespace mdJucePlugin
 					const auto& parameters = m_controller.findTrackParameters(*track, 0, 0);
 					if(!parameters.empty())
 					{
-						auto value = static_cast<uint8_t>(std::clamp<int>(
+						const auto current = static_cast<uint8_t>(std::clamp<int>(
 							parameters.front()->getUnnormalizedValue(), 0, 127));
+						auto value = current;
 						for(int i = 0; i < std::abs(steps); ++i)
 							value = md::scale::step(context->tuning, context->mask, context->root,
 								value, steps > 0 ? 1 : -1);
-						for(auto* const parameter : parameters)
-							parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
-								pluginLib::Parameter::Origin::Ui);
+						// Move the firmware's own encoder by the difference so LIVE RECORD
+						// captures it as a knob movement, and mirror the result into the
+						// parameter cache without sending a CC.
+						const int detents = static_cast<int>(value) - static_cast<int>(current);
+						if(detents != 0)
+						{
+							emitEncoderSteps(_encoder, detents);
+							for(auto* const parameter : parameters)
+								parameter->setValueFromSynth(static_cast<int>(value),
+									pluginLib::Parameter::Origin::PresetChange);
+						}
 						return;
 					}
 				}

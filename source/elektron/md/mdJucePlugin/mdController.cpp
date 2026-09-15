@@ -906,7 +906,19 @@ namespace mdJucePlugin
 			if(_message[9] & 0x01) model += 128;
 			if(_message[9] & 0x02) model |= 0x20000;
 			m_trackModels[track].store(model, std::memory_order_release);
-			return false;
+			// Data flag 0x01: the 24 synthesis/effects/routing parameters follow.
+			// Mirror them into the parameter cache so panel edits (including the
+			// quantized PTCH encoder) stay in sync without relying on CC echo.
+			if((_message[10] & 0x01) && _message.size() >= 11 + 24 + 1)
+			{
+				std::vector<md::automation::ParameterChange> changes;
+				changes.reserve(24);
+				for(uint8_t index = 0; index < 24; ++index)
+					changes.push_back({static_cast<uint8_t>(index / 8), track,
+						static_cast<uint8_t>(index % 8), static_cast<uint8_t>(_message[11 + index] & 0x7f)});
+				applyKitParameters(changes);
+			}
+			return true;
 		}
 
 		if(_source == synthLib::MidiEventSource::Device && _message.size() > 14
