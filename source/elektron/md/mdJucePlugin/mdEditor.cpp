@@ -1169,6 +1169,8 @@ namespace mdJucePlugin
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		uint8_t page = 0;
+		if(_kind == RandomizeKind::QuantizeLocks && m_scale == 0)
+			return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
 		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks)
 		{
 			const auto active = activeMachinedrumPage();
@@ -1228,7 +1230,15 @@ namespace mdJucePlugin
 		{
 			const auto context = scaleContextForTrack(track);
 			if(!context)
-				return showRandomizeMessage("This track's machine has no pitched PTCH parameter, or no kit dump has been received yet.");
+			{
+				const auto model = m_controller.getTrackModel(track);
+				if(m_scale == 0)
+					return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
+				if(model == 0xffffffffu)
+					return showRandomizeMessage("No kit dump has been received yet, so the track's machine is unknown. Try again in a moment.");
+				return showRandomizeMessage("This track's machine (model " + std::to_string(model & 0xffff)
+					+ ") has no pitched PTCH parameter.");
+			}
 			if(!pattern->hasLock(track, 0))
 				return showRandomizeMessage("The selected track has no PTCH locks to quantize.");
 			auto& row = pattern->rows[pattern->rowIndex(track, 0)];
