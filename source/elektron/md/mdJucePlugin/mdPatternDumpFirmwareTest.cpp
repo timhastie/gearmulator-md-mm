@@ -102,6 +102,22 @@ int main()
 			verify->hasLock(0, 0) ? verify->rows[verify->rowIndex(0, 0)][3] : 255);
 		require(verify->trigs[0] == newTrigs, "firmware did not store the sent trigs");
 		require(verify->hasLock(0, 0) && verify->rows[verify->rowIndex(0, 0)][0] == 100, "firmware did not store the sent lock");
+		// Randomize exclusions must survive a DAW state save/load round trip.
+		{
+			using Aspect = mdJucePlugin::Controller::RandomizeAspect;
+			controller.setExcludeMask(Aspect::Trigs, 0x0005);
+			controller.setExcludeMask(Aspect::Machines, 0x8000);
+			controller.setExcludeMask(Aspect::Locks, 0x0f0f);
+			juce::MemoryBlock state;
+			harness.audioProcessor.getStateInformation(state);
+			controller.setExcludeMask(Aspect::Trigs, 0); controller.setExcludeMask(Aspect::Machines, 0); controller.setExcludeMask(Aspect::Locks, 0);
+			harness.audioProcessor.setStateInformation(state.getData(), static_cast<int>(state.getSize()));
+			pump(50);
+			std::printf("exclusions after state reload: %04x %04x %04x\n", controller.getExcludeMask(Aspect::Trigs),
+				controller.getExcludeMask(Aspect::Machines), controller.getExcludeMask(Aspect::Locks));
+			require(controller.getExcludeMask(Aspect::Trigs) == 0x0005 && controller.getExcludeMask(Aspect::Machines) == 0x8000
+				&& controller.getExcludeMask(Aspect::Locks) == 0x0f0f, "randomize exclusions did not survive state reload");
+		}
 		std::printf("track models: ");
 		for(uint8_t t = 0; t < 16; ++t) std::printf("%x ", controller.getTrackModel(t));
 		std::printf("\nmdPatternDumpFirmwareTest: PASS\n");
