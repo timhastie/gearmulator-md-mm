@@ -41,6 +41,7 @@ set(SOURCES
 	skins/mmSfx60/mmSfx60.rcss
 	mdSettingsPanelFeel.cpp mdSettingsPanelFeel.h
 	mdSettingsScale.cpp mdSettingsScale.h
+	mdSettingsRandomization.cpp mdSettingsRandomization.h
 	mdSettingsAudioInput.cpp mdSettingsAudioInput.h
 )
 
@@ -65,6 +66,7 @@ file(GLOB MM_SKIN_ASSETS CONFIGURE_DEPENDS
 juce_add_binary_data(mdJucePlugin_BinaryData SOURCES
 	${COMMON_ASSETS} "tus_settings_gui_Machinedrum.rml"
 	"tus_settings_scale_Machinedrum.rml"
+	"tus_settings_randomization_Machinedrum.rml"
 	"tus_settings_dspaudio_Machinedrum.rml" ${MD_SKIN_ASSETS})
 juce_add_binary_data(mmJucePlugin_BinaryData SOURCES
 	${COMMON_ASSETS} "tus_settings_gui_Monomachine.rml"
