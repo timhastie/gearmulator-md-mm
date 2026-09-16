@@ -694,8 +694,13 @@ namespace mdJucePlugin
 					return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
 				}
 				if(isTrigger(_control) && bankHeld)
-					return randomizeTrackMachine(static_cast<uint8_t>(
-						static_cast<int>(_control) - static_cast<int>(md::PanelControl::Trigger1)));
+				{
+					const auto track = static_cast<uint8_t>(static_cast<int>(_control) - static_cast<int>(md::PanelControl::Trigger1));
+					randomizeTrackMachine(track);
+					if(!m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, track))
+						scheduleTrackParameterRandomization({track});
+					return;
+				}
 			}
 			else
 			{
@@ -712,8 +717,13 @@ namespace mdJucePlugin
 					return beginPatternRandomize(RandomizeKind::Everything, std::nullopt);
 				}
 				if(bankHeld && _control >= md::PanelControl::Track1 && _control <= md::PanelControl::Track6)
-					return randomizeTrackMachine(static_cast<uint8_t>(
-						static_cast<int>(_control) - static_cast<int>(md::PanelControl::Track1)));
+				{
+					const auto track = static_cast<uint8_t>(static_cast<int>(_control) - static_cast<int>(md::PanelControl::Track1));
+					randomizeTrackMachine(track);
+					if(!m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, track))
+						scheduleTrackParameterRandomization({track});
+					return;
+				}
 			}
 		}
 
@@ -1307,8 +1317,58 @@ namespace mdJucePlugin
 
 	void Editor::randomizeAllMachines()
 	{
+		std::vector<uint8_t> tracks;
 		for(uint8_t track = 0; track < trackCount(); ++track)
+		{
+			if(m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, track))
+				continue;
 			randomizeTrackMachine(track);
+			tracks.push_back(track);
+		}
+		scheduleTrackParameterRandomization(std::move(tracks));
+	}
+
+	bool Editor::rollLock()
+	{
+		return std::bernoulli_distribution(static_cast<double>(m_controller.getLockChancePercent()) / 100.0)(m_random);
+	}
+
+	void Editor::randomizeTrackParameters(const uint8_t _track)
+	{
+		applyScaleQuantizer();
+		// MD: SYNTHESIS, EFFECTS, ROUTING (VOL is ROUTING index 1).
+		// MM: SYNTH, AMP, FILTER, EFFECTS, LFO1-3 (VOL is AMP index 5).
+		const bool mm = getModel() == md::MachineModel::Monomachine;
+		const uint8_t pages = mm ? 7 : 3;
+		const uint8_t volumePage = mm ? 1 : 2, volumeIndex = mm ? 5 : 1;
+		for(uint8_t page = 0; page < pages; ++page)
+		{
+			for(uint8_t index = 0; index < 8; ++index)
+			{
+				if(page == volumePage && index == volumeIndex)
+					continue;
+				const auto& parameters = m_controller.findTrackParameters(_track, page, index);
+				const auto value = randomParameterValue(_track, page, index);
+				for(auto* const parameter : parameters)
+					parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
+						pluginLib::Parameter::Origin::Ui);
+			}
+		}
+	}
+
+	void Editor::scheduleTrackParameterRandomization(std::vector<uint8_t> _tracks)
+	{
+		if(_tracks.empty())
+			return;
+		// The machine assignment must be processed by the firmware before its
+		// parameters are written, otherwise the initialisation wipes them again.
+		juce::Timer::callAfterDelay(400, [this, token = std::weak_ptr<void>(m_lifetimeToken), tracks = std::move(_tracks)]
+		{
+			if(token.expired())
+				return;
+			for(const auto track : tracks)
+				randomizeTrackParameters(track);
+		});
 	}
 
 	void Editor::registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins)
@@ -1436,7 +1496,7 @@ namespace mdJucePlugin
 					{
 						const auto param = params[i];
 						for(size_t step = 0; step < steps; ++step)
-							if(trigs >> step & 1u)
+							if((trigs >> step & 1u) && rollLock())
 								(void)pattern->setLock(t, param, static_cast<uint8_t>(step),
 									randomParameterValue(t, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)));
 					}
@@ -1479,7 +1539,7 @@ namespace mdJucePlugin
 			{
 				for(size_t step = 0; step < steps; ++step)
 				{
-					if(!(trigs >> step & 1u))
+					if(!(trigs >> step & 1u) || !rollLock())
 						continue;
 					if(!pattern->setLock(track, param, static_cast<uint8_t>(step),
 						randomParameterValue(track, pending.page, static_cast<uint8_t>(param - pending.page * 8))))
@@ -1530,7 +1590,7 @@ namespace mdJucePlugin
 			const auto trigs = pattern->trigs(_track) & stepMask;
 			for(const auto param : _params)
 				for(size_t step = 0; step < steps; ++step)
-					if((trigs >> step & 1u) && !pattern->setLock(_track, param, static_cast<uint8_t>(step),
+					if((trigs >> step & 1u) && rollLock() && !pattern->setLock(_track, param, static_cast<uint8_t>(step),
 						randomParameterValue(_track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8))))
 						return false;
 			return true;

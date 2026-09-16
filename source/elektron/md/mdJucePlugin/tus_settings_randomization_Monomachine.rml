@@ -12,6 +12,15 @@
 			<label id="labelTrigChance">50 %</label>
 		</div>
 		<settingsspacer1/>
+		<h1>Random Parameter Locks</h1>
+		<settingsspacer1/>
+		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the current page, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
+		<settingsspacer1/>
+		<div class="settings-hlayout">
+			<input id="sliderLockChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
+			<label id="labelLockChance">50 %</label>
+		</div>
+		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>
 		<label>Untick a track to leave it out of the randomize gestures: its trigs, its machine, or its parameter locks. All tracks are included by default. Saved with the plugin state, so it travels with your DAW project.</label>

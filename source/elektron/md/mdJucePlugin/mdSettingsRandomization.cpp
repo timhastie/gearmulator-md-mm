@@ -54,35 +54,43 @@ namespace mdJucePlugin
 			}
 		}
 
-		auto* const slider = juceRmlUi::helper::findChild(_root, "sliderTrigChance", false);
-		auto* const label = juceRmlUi::helper::findChild(_root, "labelTrigChance", false);
-		if(!slider || !label)
-			return;
 		auto& controller = m_editor.getMdController();
-		const auto show = [label](const int _percent)
+		const auto bindSlider = [_root, &controller](const char* _sliderId, const char* _labelId,
+			int (Controller::*_get)() const, void (Controller::*_set)(int), const int _default)
 		{
-			label->SetInnerRML(Rml::StringUtilities::EncodeRml(std::to_string(_percent) + " %"));
-		};
-		const auto current = controller.getTrigChancePercent();
-		slider->SetAttribute("value", std::to_string(current));
-		show(current);
-		juceRmlUi::EventListener::Add(slider, Rml::EventId::Change, [slider, &controller, show](Rml::Event& _event)
-		{
-			_event.StopPropagation();
-			const auto* const value = slider->GetAttribute("value");
-			if(!value)
+			auto* const slider = juceRmlUi::helper::findChild(_root, _sliderId, false);
+			auto* const label = juceRmlUi::helper::findChild(_root, _labelId, false);
+			if(!slider || !label)
 				return;
-			const auto percent = std::clamp(static_cast<int>(std::lround(
-				value->Get<float>(slider->GetCoreInstance()))), 1, 99);
-			controller.setTrigChancePercent(percent);
-			show(percent);
-		});
-		juceRmlUi::EventListener::Add(slider, Rml::EventId::Dblclick, [slider, &controller, show](Rml::Event& _event)
-		{
-			_event.StopPropagation();
-			slider->SetAttribute("value", std::to_string(Controller::g_trigChanceDefault));
-			controller.setTrigChancePercent(Controller::g_trigChanceDefault);
-			show(Controller::g_trigChanceDefault);
-		});
+			const auto show = [label](const int _percent)
+			{
+				label->SetInnerRML(Rml::StringUtilities::EncodeRml(std::to_string(_percent) + " %"));
+			};
+			const auto current = (controller.*_get)();
+			slider->SetAttribute("value", std::to_string(current));
+			show(current);
+			juceRmlUi::EventListener::Add(slider, Rml::EventId::Change, [slider, &controller, show, _set](Rml::Event& _event)
+			{
+				_event.StopPropagation();
+				const auto* const value = slider->GetAttribute("value");
+				if(!value)
+					return;
+				const auto percent = std::clamp(static_cast<int>(std::lround(
+					value->Get<float>(slider->GetCoreInstance()))), 1, 99);
+				(controller.*_set)(percent);
+				show(percent);
+			});
+			juceRmlUi::EventListener::Add(slider, Rml::EventId::Dblclick, [slider, &controller, show, _set, _default](Rml::Event& _event)
+			{
+				_event.StopPropagation();
+				slider->SetAttribute("value", std::to_string(_default));
+				(controller.*_set)(_default);
+				show(_default);
+			});
+		};
+		bindSlider("sliderTrigChance", "labelTrigChance", &Controller::getTrigChancePercent,
+			&Controller::setTrigChancePercent, Controller::g_trigChanceDefault);
+		bindSlider("sliderLockChance", "labelLockChance", &Controller::getLockChancePercent,
+			&Controller::setLockChancePercent, Controller::g_lockChanceDefault);
 	}
 }

@@ -108,6 +108,13 @@ namespace mdJucePlugin
 		{
 			m_randomizeExclude[static_cast<size_t>(_aspect)].store(_mask, std::memory_order_release);
 		}
+		// Chance (1..99 %) that a trig receives a lock on a randomized parameter; per instance.
+		static constexpr int g_lockChanceDefault = 50;
+		int getLockChancePercent() const { return m_lockChancePercent.load(std::memory_order_acquire); }
+		void setLockChancePercent(const int _percent)
+		{
+			m_lockChancePercent.store(std::clamp(_percent, 1, 99), std::memory_order_release);
+		}
 		// Chance (1..99 %) that a step receives a trig; per instance, saved with the state.
 		static constexpr int g_trigChanceDefault = 50;
 		int getTrigChancePercent() const { return m_trigChancePercent.load(std::memory_order_acquire); }
@@ -248,6 +255,7 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint32_t>, 16> m_trackModels;
 		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
 		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
+		std::atomic<int> m_lockChancePercent{g_lockChanceDefault};
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
