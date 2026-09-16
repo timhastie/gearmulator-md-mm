@@ -158,6 +158,11 @@ namespace mdJucePlugin
 		uint8_t snapNote(uint8_t _note) const;
 		void onMonomachinePatternDump(const std::vector<uint8_t>& _dump, const PendingRandomize& _pending);
 		bool isPanelControlHeld(md::PanelControl _control) const;
+		// Keyboard modifiers: Shift presses and holds FUNCTION for as long as it is
+		// down; Z is the hold key for any other panel button (Z-click latches it).
+		static bool holdKeyDown();
+		void serviceShiftFunction();
+		bool m_shiftFunctionHeld = false;
 		void showRandomizeMessage(const std::string& _message) const;
 		struct ScaleContext
 		{

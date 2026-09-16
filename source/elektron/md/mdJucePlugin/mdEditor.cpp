@@ -154,6 +154,14 @@ namespace mdJucePlugin
 	Editor::~Editor()
 	{
 		m_controller.setPatternDumpListener({});
+		if(m_shiftFunctionHeld)
+		{
+			if(const auto packet = md::panelPacket(getModel(), md::PanelControl::Function))
+			{
+				const auto combined = m_panelRows.release(*packet);
+				(void)sendPanelEvent(combined.row, combined.mask);
+			}
+		}
 		juce::Desktop::getInstance().removeFocusChangeListener(this);
 		m_panelSteps.clear();
 		cancelPanelInputGestures();
@@ -541,11 +549,11 @@ namespace mdJucePlugin
 				&& panelAffordances::isPatternBank(pb.control))
 			{
 				b->SetAttribute("title",
-					"Click to hold this bank until a trig; Shift uses the same bank latch");
+					"Click to hold this bank until a trig; Z uses the same bank latch");
 				juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 					[this, b, packet, control = pb.control](Rml::Event& _event)
 				{
-					const bool shiftDown = _event.GetParameter<int>("shift_key", 0) != 0;
+					const bool shiftDown = holdKeyDown();
 					if(!shiftDown && !m_shiftPanelLatch.empty())
 						releasePanelButtonGestures();
 					if(panelAffordances::usesPersistentPatternBankLatch(getModel(),
@@ -565,16 +573,15 @@ namespace mdJucePlugin
 
 			if(isTrigger(pb.control))
 				b->SetAttribute("title",
-					"Shift-click to hold this trig; release Shift to let go");
+					"Z-click to hold this trig; release Z to let go. Shift holds FUNCTION.");
 			else
 				b->SetAttribute("title",
-					"Shift-click to hold; use another control; release Shift to let go");
+					"Z-click to hold; use another control; release Z to let go. Shift holds FUNCTION.");
 
 			juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 				[this, b, packet, control = pb.control](Rml::Event& _event)
 			{
-				pressPanelButton(b, control, *packet,
-					_event.GetParameter<int>("shift_key", 0) != 0);
+				pressPanelButton(b, control, *packet, holdKeyDown());
 			});
 
 			// Mouseout releases too, otherwise dragging off a button leaves it held.
@@ -593,7 +600,7 @@ namespace mdJucePlugin
 				{
 					if(!juceRmlUi::helper::getKeyModAlt(_event))
 						releaseEncoderPress();
-					if(_event.GetParameter<int>("shift_key", 0) == 0
+					if(juceRmlUi::helper::getKeyIdentifier(_event) == Rml::Input::KI_Z
 						&& !m_shiftPanelLatch.empty())
 						releasePanelButtonGestures();
 				});
@@ -1125,8 +1132,38 @@ namespace mdJucePlugin
 			"Randomize", _message);
 	}
 
+	bool Editor::holdKeyDown()
+	{
+		return juce::KeyPress::isKeyCurrentlyDown('Z') || juce::KeyPress::isKeyCurrentlyDown('z');
+	}
+
+	void Editor::serviceShiftFunction()
+	{
+		auto* const component = getRmlComponent();
+		const bool wanted = component != nullptr
+			&& (component->isMouseOver(true) || component->hasKeyboardFocus(true))
+			&& juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown();
+		if(wanted == m_shiftFunctionHeld)
+			return;
+		const auto packet = md::panelPacket(getModel(), md::PanelControl::Function);
+		if(!packet)
+			return;
+		m_shiftFunctionHeld = wanted;
+		const auto combined = wanted ? m_panelRows.press(*packet) : m_panelRows.release(*packet);
+		(void)sendPanelEvent(combined.row, combined.mask);
+		for(const auto& panelButton : g_panelButtons)
+		{
+			if(panelButton.control != md::PanelControl::Function)
+				continue;
+			if(auto* const button = findChild<juceRmlUi::ElemButton>(panelButton.id, false))
+				juceRmlUi::ElemButton::setChecked(button, wanted);
+		}
+	}
+
 	bool Editor::isPanelControlHeld(const md::PanelControl _control) const
 	{
+		if(_control == md::PanelControl::Function && m_shiftFunctionHeld)
+			return true;
 		if(m_shiftPanelLatch.contains(_control))
 			return true;
 		const auto packet = md::panelPacket(getModel(), _control);
@@ -2734,9 +2771,9 @@ namespace mdJucePlugin
 			releaseEncoderPress();
 		// Some plugin hosts can lose the modifier key-up when focus changes. Poll
 		// native state as a fail-safe so no panel row remains held indefinitely.
-		if(!m_shiftPanelLatch.empty()
-			&& !juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown())
+		if(!m_shiftPanelLatch.empty() && !holdKeyDown())
 			releasePanelButtonGestures();
+		serviceShiftFunction();
 
 		const auto hadFrontPanelSnapshot = m_frontPanelSnapshotValid;
 		m_frontPanelSnapshotValid = refreshFrontPanelState(nowMilliseconds);
