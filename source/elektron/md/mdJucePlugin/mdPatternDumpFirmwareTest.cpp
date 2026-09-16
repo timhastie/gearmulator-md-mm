@@ -60,11 +60,26 @@ int main()
 			const auto before = harness.telemetry().consumed;
 			const double rate = std::getenv("HOST_SAMPLERATE") ? std::atof(std::getenv("HOST_SAMPLERATE")) : 48000.0;
 			const int blocks = static_cast<int>(10.0 * rate / BlockSize);
+			// Timing regularity: ticks consumed per host block, and the spread of
+			// gaps (in blocks) between consecutive ticks.
+			std::vector<int> perBlock; int lastTickBlock = -1, minGap = 1 << 30, maxGap = 0; uint64_t previous = before;
 			for(int i = 0; i < blocks; ++i)
 			{
 				playHead.ppq += static_cast<double>(BlockSize) / rate * playHead.bpm / 60.0;
 				pump(1);
+				const auto now = harness.telemetry().consumed;
+				const int ticks = static_cast<int>(now - previous); previous = now;
+				perBlock.push_back(ticks);
+				if(ticks > 0)
+				{
+					if(lastTickBlock >= 0) { minGap = std::min(minGap, i - lastTickBlock); maxGap = std::max(maxGap, i - lastTickBlock); }
+					lastTickBlock = i;
+				}
 			}
+			int maxPerBlock = 0; for(const auto t : perBlock) maxPerBlock = std::max(maxPerBlock, t);
+			const double blockMs = 1000.0 * BlockSize / rate, tickMs = 60000.0 / playHead.bpm / 24.0;
+			std::printf("timing: block %.2f ms, ideal tick spacing %.2f ms = %.2f blocks; observed gaps %d..%d blocks, max ticks in one block %d\n",
+				blockMs, tickMs, tickMs / blockMs, minGap, maxGap, maxPerBlock);
 			const auto after = harness.telemetry().consumed;
 			const double expected = playHead.bpm / 60.0 * 24.0 * 10.0;
 			std::printf("clock test @%.0f Hz: host %.1f bpm for 10 s -> firmware consumed %llu MIDI bytes (expected ~%.0f clock ticks)\n",

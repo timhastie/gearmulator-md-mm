@@ -387,6 +387,16 @@ namespace mdJucePlugin
 	void Controller::onControllerTimer()
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		{
+			const auto& clock = getProcessor().getPlugin().getMidiClock();
+			const auto relocates = clock.getRelocateCount(), rephases = clock.getRephaseCount();
+			const auto now = milliseconds();
+			if((relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases) && now - m_lastClockLogMs > 2000)
+			{
+				diagnostic("host clock: relocations " + std::to_string(relocates) + ", re-phases " + std::to_string(rephases));
+				m_loggedClockRelocates = relocates; m_loggedClockRephases = rephases; m_lastClockLogMs = now;
+			}
+		}
 		// The same protocol service also runs from an offline render callback, which
 		// is non-realtime but is not necessarily JUCE's message thread. Keep editor
 		// Value/listener work on the message thread while still allowing headless

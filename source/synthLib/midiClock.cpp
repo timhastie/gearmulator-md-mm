@@ -30,12 +30,26 @@ namespace synthLib
 		const auto samplesPerClock = rate * 60.0 / (m_lastBpm * ClockTicksPerQuarter);
 		const bool positionKnown = _ppqKnown && std::isfinite(_ppqPos) && std::abs(_ppqPos) < 1e12;
 		const auto ppq = positionKnown ? _ppqPos : (m_isPlaying ? m_expectedPpq : 0.0);
-		// Allow at most two samples of host rounding. Even within this tolerance
-		// the pulse offsets use current PPQ; the tolerance only avoids false
-		// STOP/CONTINUE edges. A loop or seek relocates before any new clock.
-		if(m_isPlaying && positionKnown
-			&& std::abs(ppq - m_expectedPpq) > std::max(2 * quartersPerSample, 1e-8))
-			stop();
+		// Hosts report positions that drift slightly from what the tempo predicts
+		// (delay compensation, fractional tempos, rounding). Absorb anything up to
+		// half a clock tick by re-phasing the tick counter without any transport
+		// message. Only a real jump of a beat or more (loop wrap, seek) relocates
+		// the instrument with STOP / song position / CONTINUE.
+		if(m_isPlaying && positionKnown)
+		{
+			const auto deviation = std::abs(ppq - m_expectedPpq);
+			const auto rephaseTolerance = std::max(0.5 / ClockTicksPerQuarter, 2 * quartersPerSample);
+			if(deviation >= 1.0)
+			{
+				++m_relocates;
+				stop();
+			}
+			else if(deviation > rephaseTolerance)
+			{
+				++m_rephases;
+				m_nextClockTick = static_cast<int64_t>(std::ceil(ppq * ClockTicksPerQuarter - 1e-9));
+			}
+		}
 		if(!m_isPlaying) start(ppq);
 
 		for(;; ++m_nextClockTick)

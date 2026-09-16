@@ -263,6 +263,7 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
 		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
 		std::atomic<int> m_lockChancePercent{g_lockChanceDefault};
+		uint64_t m_loggedClockRelocates = 0, m_loggedClockRephases = 0, m_lastClockLogMs = 0;
 		std::atomic<uint32_t> m_protectValuesMask{0xffffffffu};
 		std::atomic<uint32_t> m_protectLocksMask{0xffffffffu};
 		std::mutex m_patternDumpListenerLock;

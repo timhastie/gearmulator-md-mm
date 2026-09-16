@@ -41,6 +41,7 @@ namespace synthLib
 
 		void setBlockSize(uint32_t _blockSize);
 		void reserveMidiEventCapacity(size_t _capacity = RealtimeMidiEventCapacity);
+		const MidiClock& getMidiClock() const { return m_midiClock; }
 
 		uint32_t getLatencyMidiToOutput() const;
 		uint32_t getLatencyInputToOutput() const;
