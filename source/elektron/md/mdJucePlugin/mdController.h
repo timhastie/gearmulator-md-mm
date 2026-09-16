@@ -264,7 +264,7 @@ namespace mdJucePlugin
 		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
 		std::atomic<int> m_lockChancePercent{g_lockChanceDefault};
 		uint64_t m_loggedClockRelocates = 0, m_loggedClockRephases = 0, m_lastClockLogMs = 0;
-		uint64_t m_loggedHostClocks = 0, m_loggedHostTransport = 0;
+		uint64_t m_loggedHostClocks = 0, m_loggedHostTransport = 0, m_loggedTicks = 0;
 		std::atomic<uint32_t> m_protectValuesMask{0xffffffffu};
 		std::atomic<uint32_t> m_protectLocksMask{0xffffffffu};
 		std::mutex m_patternDumpListenerLock;

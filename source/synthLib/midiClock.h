@@ -22,6 +22,11 @@ namespace synthLib
 		uint64_t getRephaseCount() const { return m_driftBlocks; }
 		uint64_t getRelocateCount() const { return m_relocates; }
 		double getMaxDriftTicks() const { return m_maxDriftTicks; }
+		double getLastBpm() const { return m_lastBpm; }
+		double getLastPpq() const { return m_lastPpq; }
+		double getLastRate() const { return m_lastRate; }
+		size_t getLastCount() const { return m_lastCount; }
+		uint64_t getTicksEmitted() const { return static_cast<uint64_t>(m_nextClockTick); }
 	private:
 		void stop();
 		void start(double _ppqPos);
@@ -35,5 +40,7 @@ namespace synthLib
 		uint64_t m_driftBlocks = 0;
 		uint64_t m_relocates = 0;
 		double m_maxDriftTicks = 0.0;
+		double m_lastPpq = 0.0, m_lastRate = 0.0;
+		size_t m_lastCount = 0;
 	};
 }

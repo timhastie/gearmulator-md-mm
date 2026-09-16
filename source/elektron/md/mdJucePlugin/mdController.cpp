@@ -393,14 +393,24 @@ namespace mdJucePlugin
 			const auto hostClocks = getProcessor().getHostClockMessageCount();
 			const auto hostTransport = getProcessor().getHostTransportMessageCount();
 			const auto now = milliseconds();
-			if((relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases
-				|| hostClocks != m_loggedHostClocks || hostTransport != m_loggedHostTransport) && now - m_lastClockLogMs > 2000)
+			const bool changed = relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases
+				|| hostClocks != m_loggedHostClocks || hostTransport != m_loggedHostTransport
+				|| clock.getTicksEmitted() != m_loggedTicks;
+			if(changed && now - m_lastClockLogMs > 2000)
 			{
 				diagnostic("clock: relocations " + std::to_string(relocates) + ", host drift blocks " + std::to_string(rephases)
 					+ " (max " + std::to_string(clock.getMaxDriftTicks()) + " ticks); host-supplied clock bytes "
-					+ std::to_string(hostClocks) + ", transport bytes " + std::to_string(hostTransport));
+					+ std::to_string(hostClocks) + ", transport bytes " + std::to_string(hostTransport)
+					+ "; bpm " + std::to_string(clock.getLastBpm()) + ", host rate " + std::to_string(clock.getLastRate())
+					+ ", block " + std::to_string(clock.getLastCount()) + ", ppq " + std::to_string(clock.getLastPpq())
+					+ ", ticks emitted " + std::to_string(clock.getTicksEmitted())
+					+ ", actual host rate " + std::to_string(getProcessor().getSampleRate())
+					+ ", host block " + std::to_string(getProcessor().getBlockSize())
+					+ ", callback overruns " + std::to_string(
+						getProcessor().getPlugin().getRealtimeInstrumentation().snapshot().outerHostCallbackOverrunCount));
 				m_loggedClockRelocates = relocates; m_loggedClockRephases = rephases;
 				m_loggedHostClocks = hostClocks; m_loggedHostTransport = hostTransport; m_lastClockLogMs = now;
+				m_loggedTicks = clock.getTicksEmitted();
 			}
 		}
 		// The same protocol service also runs from an offline render callback, which

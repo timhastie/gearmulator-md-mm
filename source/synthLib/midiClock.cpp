@@ -31,6 +31,7 @@ namespace synthLib
 		const auto samplesPerClock = rate * 60.0 / (m_lastBpm * ClockTicksPerQuarter);
 		const bool positionKnown = _ppqKnown && std::isfinite(_ppqPos) && std::abs(_ppqPos) < 1e12;
 		const auto ppq = positionKnown ? _ppqPos : 0.0;
+		m_lastPpq = ppq; m_lastRate = rate; m_lastCount = _sampleCount;
 
 		if(m_isPlaying && positionKnown)
 		{
