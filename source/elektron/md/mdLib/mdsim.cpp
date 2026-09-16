@@ -1,5 +1,8 @@
 #include "mdsim.h"
 
+#include <cstdio>
+#include <cstdlib>
+
 #include <utility>
 
 // md::Sim - MCF5206e SIM peripheral model. See mdsim.h for the register map and
@@ -62,6 +65,12 @@ namespace md
 	{
 		if(_offset >= g_windowSize)
 			return 0;
+		static const bool traceUrb = std::getenv("GEARMULATOR_SIM_TRACE") != nullptr;
+		if(traceUrb && _offset >= g_timer1Base && _offset < g_timer2Base + 0x20)
+			std::fprintf(stderr, "[TMR] read off=0x%03x\n", _offset);
+		if(traceUrb && _offset == g_uart1Base + g_uartRxTx && !m_uart[g_uartMidi].rx.empty())
+			std::fprintf(stderr, "[URB] cyc=%llu byte=0x%02x\n",
+				static_cast<unsigned long long>(m_traceCycles), m_uart[g_uartMidi].rx.bytes[m_uart[g_uartMidi].rx.read]);
 
 		// Parallel port data (UM 10.3.2.2): input pins read their pin level (idle
 		// HIGH on the MD), output pins read back the driven latch value. This is the
@@ -105,6 +114,9 @@ namespace md
 
 	void Sim::write8(const uint32_t _offset, const uint8_t _value)
 	{
+		static const bool trace8 = std::getenv("GEARMULATOR_SIM_TRACE") != nullptr;
+		if(trace8 && ((_offset >= g_timer1Base && _offset < g_timer2Base + 0x20) || (_offset >= 0x140 && _offset < 0x1c0)))
+			std::fprintf(stderr, "[SIM] w8 off=0x%03x val=0x%02x\n", _offset, _value);
 		if(_offset >= g_windowSize)
 			return;
 
@@ -187,6 +199,9 @@ namespace md
 
 	void Sim::write16(const uint32_t _offset, const uint16_t _value)
 	{
+		static const bool trace = std::getenv("GEARMULATOR_SIM_TRACE") != nullptr;
+		if(trace && ((_offset >= g_timer1Base && _offset < g_timer2Base + 0x20)))
+			std::fprintf(stderr, "[SIM] w16 off=0x%03x val=0x%04x\n", _offset, _value);
 		write8(_offset,     static_cast<uint8_t>(_value >> 8));
 		write8(_offset + 1, static_cast<uint8_t>(_value & 0xff));
 	}
@@ -516,10 +531,15 @@ namespace md
 		timer.reference = reg16(_base + g_timerTrr);
 		timer.period = static_cast<uint32_t>(timer.reference) + 1;
 		timer.freeRunning = (tmr & g_tmrFrr) == 0;
+		static const bool traceTimer = std::getenv("GEARMULATOR_SIM_TRACE") != nullptr;
+		if(traceTimer)
+			std::fprintf(stderr, "[TMRCFG] base=0x%03x tmr=0x%04x trr=%u iclk=%u prescale=%u clockDiv=%u div=%u running=%d freeRunning=%d\n",
+				_base, tmr, timer.reference, iclk, prescale, clockDiv, timer.div, timer.running, timer.freeRunning);
 	}
 
 	void Sim::exec(const uint32_t _cycles)
 	{
+		m_traceCycles += _cycles;
 		stepTimer(0, g_timer1Base, _cycles);
 		stepTimer(1, g_timer2Base, _cycles);
 		stepPanelTransmitter(_cycles);

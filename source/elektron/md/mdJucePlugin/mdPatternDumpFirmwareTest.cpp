@@ -3,8 +3,12 @@
 #include "mdAutomationTestSupport.h"
 #include "mdLib/mdpatterndump.h"
 #include "mdLib/mmpatterndump.h"
+#include "mdLib/mdhardware.h"
+#include "mdLib/mdfrontpanel.h"
 #include "mdLib/mdpanel.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 int main()
@@ -40,6 +44,157 @@ int main()
 
 		std::vector<uint8_t> captured;
 		controller.setPatternDumpListener([&captured](const std::vector<uint8_t>& _dump) { captured = _dump; });
+
+		// SYNCTEST=<bpm>: put the MD on external tempo/transport by editing its
+		// global dump, write a four-on-the-floor pattern, run the host transport
+		// and time the audio onsets the machine produces.
+		if(const auto* const syncEnv = std::getenv("SYNCTEST"))
+		{
+			std::vector<uint8_t> global;
+			controller.setSysexListener([&global](const std::vector<uint8_t>& _m)
+			{
+				if(_m.size() > 12 && _m[6] == 0x50 && _m[4] == 0x02) global = _m;
+			});
+			controller.sendSysexToDevice(md::automation::sysex::globalRequest(md::MachineModel::Machinedrum, 0));
+			for(int i = 0; i < 2000 && global.empty(); ++i) pump(1);
+			require(!global.empty(), "no global dump");
+			std::printf("global dump %zu bytes; sync byte 0x%02x tempo %u\n", global.size(), global[178], (global[175] << 7) | global[176]);
+			const bool internal = std::getenv("SYNCTEST_INTERNAL") != nullptr;
+			global[178] = static_cast<uint8_t>((internal ? (global[178] & ~0x01) : (global[178] | 0x01)) & ~0x10);	// TEMPO IN, CTRL IN = ON
+			std::printf("mode: %s tempo, %s\n", internal ? "internal" : "external", realtime ? "realtime" : "offline");
+			{
+				const auto checksumPos = global.size() - 5;
+				uint32_t sum = 0; for(size_t i = 9; i < checksumPos; ++i) sum += global[i];
+				global[checksumPos] = static_cast<uint8_t>(sum >> 7 & 0x7f); global[checksumPos + 1] = static_cast<uint8_t>(sum & 0x7f);
+			}
+			if(internal) { global[175] = static_cast<uint8_t>((120 * 24) >> 7); global[176] = static_cast<uint8_t>((120 * 24) & 0x7f); }
+			{
+				const auto checksumPos = global.size() - 5;
+				uint32_t sum = 0; for(size_t i = 9; i < checksumPos; ++i) sum += global[i];
+				global[checksumPos] = static_cast<uint8_t>(sum >> 7 & 0x7f); global[checksumPos + 1] = static_cast<uint8_t>(sum & 0x7f);
+			}
+			controller.sendSysexToDevice(global);
+			pump(300);
+			// Reload global slot 0 so the running machine adopts it, then read it back.
+			controller.sendSysexToDevice({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x71, 0x01, 0x00, 0xf7});
+			pump(300);
+			global.clear();
+			controller.sendSysexToDevice(md::automation::sysex::globalRequest(md::MachineModel::Machinedrum, 0));
+			for(int i = 0; i < 2000 && global.empty(); ++i) pump(1);
+			require(!global.empty(), "no global dump after reload");
+			std::printf("global after reload: sync byte 0x%02x tempo %u\n", global[178], (global[175] << 7) | global[176]);
+			// Pattern: track 1 trig on every beat.
+			captured.clear();
+			controller.requestCurrentPatternDump();
+			for(int i = 0; i < 6000 && captured.empty(); ++i) pump(1);
+			require(!captured.empty(), "no pattern dump");
+			auto pattern = md::patternDump::decode(captured);
+			require(pattern.has_value(), "pattern decode failed");
+			for(auto& t : pattern->trigs) t = 0;
+			pattern->trigs[0] = 0x1111ull;
+			pattern->patternLength = 16;
+			controller.sendSysexToDevice(md::patternDump::encode(*pattern));
+			pump(400);
+			// Re-select the pattern so the sequencer plays the stored version, then verify.
+			controller.sendSysexToDevice({0xf0, 0x00, 0x20, 0x3c, 0x02, 0x00, 0x71, 0x04, pattern->position, 0xf7});
+			pump(300);
+			captured.clear();
+			controller.requestCurrentPatternDump();
+			for(int i = 0; i < 6000 && captured.empty(); ++i) pump(1);
+			{
+				const auto check = md::patternDump::decode(captured);
+				std::printf("pattern after write: track1 trigs 0x%llx, length %u\n",
+					check ? static_cast<unsigned long long>(check->trigs[0]) : 0ull, check ? check->patternLength : 0);
+			}
+
+			class PlayingPlayHead final : public juce::AudioPlayHead
+			{
+			public:
+				double bpm = 120.0; double ppq = 0.0;
+				juce::Optional<PositionInfo> getPosition() const override
+				{
+					PositionInfo r; r.setIsPlaying(true); r.setIsRecording(false); r.setBpm(bpm); r.setPpqPosition(ppq); return r;
+				}
+			} playHead;
+			playHead.bpm = std::atof(syncEnv);
+			const double rate = std::getenv("HOST_SAMPLERATE") ? std::atof(std::getenv("HOST_SAMPLERATE")) : 48000.0;
+			harness.audioProcessor.setPlayHead(&playHead);
+			const int seconds = 24;
+			const int blocks = static_cast<int>(seconds * rate / BlockSize);
+			std::vector<double> onsets; double quiet = 0; int quietBlocks = 0;
+			// Step-LED chase: time every newly lit step LED (one per 16th note).
+			std::vector<double> stepEvents; uint32_t previousLit = 0;
+			for(int i = 0; i < blocks; ++i)
+			{
+				pump(1);
+				{
+					uint32_t lit = 0;
+					harness.processor.getPlugin().withDeviceLocked([&lit](synthLib::Device* const _device)
+					{
+						if(auto* const device = dynamic_cast<md::Device*>(_device))
+						{
+							const auto panel = device->getHardware().getFrontPanelSnapshot();
+							for(uint32_t k = 0; k < 16; ++k)
+								if(panel.getStepLed(k)) lit |= 1u << k;
+						}
+					});
+					const auto newlyLit = lit & ~previousLit;
+					if(newlyLit && i > 0)
+						stepEvents.push_back(static_cast<double>(i) * BlockSize / rate);
+					previousLit = lit;
+				}
+				playHead.ppq += static_cast<double>(BlockSize) / rate * playHead.bpm / 60.0;
+				double energy = 0;
+				for(int c = 0; c < harness.audio.getNumChannels(); ++c)
+				{
+					const auto* d = harness.audio.getReadPointer(c);
+					for(int n = 0; n < BlockSize; ++n) energy += d[n] * d[n];
+				}
+				const double rms = std::sqrt(energy / (BlockSize * harness.audio.getNumChannels()));
+				// A hit: energy jumps to at least 4x the previous block and above a floor.
+				const double t = static_cast<double>(i) * BlockSize / rate;
+				if(rms > 0.02 && rms > 2.0 * quiet && (onsets.empty() || t - onsets.back() > 0.25))
+					onsets.push_back(t);
+				quiet = rms;
+				(void)quietBlocks;
+			}
+			if(stepEvents.size() > 20)
+			{
+				double sum = 0, mn = 1e9, mx = 0; size_t n = 0;
+				for(size_t k = 1; k < stepEvents.size(); ++k)
+				{
+					if(stepEvents[k] < 4.0) continue;
+					const auto iv = stepEvents[k] - stepEvents[k - 1];
+					sum += iv; mn = std::min(mn, iv); mx = std::max(mx, iv); ++n;
+				}
+				const auto first = std::lower_bound(stepEvents.begin(), stepEvents.end(), 4.0);
+				const auto span = stepEvents.back() - *first; const auto steps = static_cast<double>(stepEvents.end() - first - 1);
+				std::printf("step LEDs: %zu events; mean 16th %.5f s (min %.4f max %.4f) -> %.3f bpm; baseline %.3f s / %.0f steps = %.3f bpm  [host expects %.5f s]\n",
+					stepEvents.size(), sum / n, mn, mx, 15.0 / (sum / n), span, steps, 15.0 / (span / steps), 15.0 / playHead.bpm);
+			}
+			else
+				std::printf("step LEDs: only %zu events\n", stepEvents.size());
+			std::printf("onsets: %zu\n", onsets.size());
+			double sum = 0, mn = 1e9, mx = 0; size_t n = 0;
+			for(size_t i = 1; i < onsets.size(); ++i)
+			{
+				const auto iv = onsets[i] - onsets[i - 1];
+				if(i <= 6 || i + 3 >= onsets.size()) std::printf("  onset %zu at %.3f s, interval %.4f s\n", i, onsets[i], iv);
+				if(onsets[i] > 4.0) { sum += iv; mn = std::min(mn, iv); mx = std::max(mx, iv); ++n; }
+			}
+			if(n)
+				std::printf("after 4 s: %zu intervals, mean %.4f s (%.2f bpm), min %.4f, max %.4f  [host %.1f bpm expects %.4f s]\n",
+					n, sum / n, 60.0 / (sum / n), mn, mx, playHead.bpm, 60.0 / playHead.bpm);
+			// Long-baseline estimate: first to last onset.
+			if(onsets.size() > 8)
+			{
+				const auto beats = std::round((onsets.back() - onsets[4]) / (60.0 / playHead.bpm) * 0.96);
+				std::printf("baseline: %.3f s over %zu hits -> %.4f s per hit = %.2f bpm\n", onsets.back() - onsets[4], onsets.size() - 5,
+					(onsets.back() - onsets[4]) / (onsets.size() - 5), 60.0 / ((onsets.back() - onsets[4]) / (onsets.size() - 5)));
+				(void)beats;
+			}
+			return 0;
+		}
 
 		// CLOCKTEST=<bpm>: play the host transport at that tempo for 10 s and count
 		// the MIDI bytes the firmware consumes (24 clock bytes per beat expected).

@@ -350,7 +350,8 @@ namespace md
 		// re-armed (cleared) when the ISR clears TER. UART TX: set true when the transmitter
 		// wants an interrupt (UIMR enabled / a UTB write), cleared when injected.
 		std::array<bool, 2> m_timerIrqInjected{};	// Timer 1 / Timer 2
-		std::array<bool, 2> m_uartTxIrqArmed{};		// UART1 / UART2 transmitter-ready
+		std::array<bool, 2> m_uartTxIrqArmed{};
+		uint64_t m_traceCycles = 0;	// diagnostics only		// UART1 / UART2 transmitter-ready
 		std::array<bool, 2> m_uartRxIrqArmed{};		// unoffered RX source, independent of UIMR
 		// Most ColdFire instructions cannot create a SIM interrupt.  This conservative
 		// gate is raised by every source/configuration transition and cleared only after

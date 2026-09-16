@@ -203,7 +203,9 @@ namespace mdAutomationTest
 		mdJucePlugin::Controller& controller;
 
 	private:
-		juce::AudioBuffer<float> audio;
+	public:
+		juce::AudioBuffer<float> audio;	// last processed host block (output)
+	private:
 		juce::MidiBuffer midi;
 		bool prepared = false;
 	};

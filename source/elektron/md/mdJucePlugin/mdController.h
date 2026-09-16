@@ -81,6 +81,8 @@ namespace mdJucePlugin
 		// Pattern dump round trip for editor gestures. The listener is invoked on
 		// the controller's protocol thread with device-origin 0x67 dumps.
 		void setPatternDumpListener(std::function<void(const std::vector<uint8_t>&)> _listener);
+		// Every device-origin SysEx message (tests / diagnostics).
+		void setSysexListener(std::function<void(const std::vector<uint8_t>&)> _listener);
 		void requestCurrentPatternDump();
 		void sendSysexToDevice(const std::vector<uint8_t>& _message) const;
 		// Saves the live kit into its own slot. Returns false when the slot is unknown.
@@ -269,6 +271,7 @@ namespace mdJucePlugin
 		std::atomic<uint32_t> m_protectLocksMask{0xffffffffu};
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
+		std::function<void(const std::vector<uint8_t>&)> m_sysexListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)
 	};
 }

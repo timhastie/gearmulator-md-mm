@@ -358,6 +358,12 @@ namespace mdJucePlugin
 		return true;
 	}
 
+	void Controller::setSysexListener(std::function<void(const std::vector<uint8_t>&)> _listener)
+	{
+		const std::lock_guard listenerLock(m_patternDumpListenerLock);
+		m_sysexListener = std::move(_listener);
+	}
+
 	void Controller::setPatternDumpListener(
 		std::function<void(const std::vector<uint8_t>&)> _listener)
 	{
@@ -861,6 +867,16 @@ namespace mdJucePlugin
 		const synthLib::MidiEventSource _source)
 	{
 		const std::lock_guard synchronizationLock(m_synchronizationLock);
+		if(_source == synthLib::MidiEventSource::Device)
+		{
+			std::function<void(const std::vector<uint8_t>&)> listener;
+			{
+				const std::lock_guard listenerLock(m_patternDumpListenerLock);
+				listener = m_sysexListener;
+			}
+			if(listener)
+				listener(std::vector<uint8_t>(_message.begin(), _message.end()));
+		}
 		if(_message.size() >= 9)
 			diagnostic("sysex from source " + std::to_string(static_cast<int>(_source)) + ": "
 				+ std::to_string(_message.size()) + " bytes, cmd=0x"
