@@ -390,11 +390,16 @@ namespace mdJucePlugin
 		{
 			const auto& clock = getProcessor().getPlugin().getMidiClock();
 			const auto relocates = clock.getRelocateCount(), rephases = clock.getRephaseCount();
+			const auto hostClocks = getProcessor().getHostClockMessageCount();
+			const auto hostTransport = getProcessor().getHostTransportMessageCount();
 			const auto now = milliseconds();
-			if((relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases) && now - m_lastClockLogMs > 2000)
+			if((relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases
+				|| hostClocks != m_loggedHostClocks || hostTransport != m_loggedHostTransport) && now - m_lastClockLogMs > 2000)
 			{
-				diagnostic("host clock: relocations " + std::to_string(relocates) + ", re-phases " + std::to_string(rephases));
-				m_loggedClockRelocates = relocates; m_loggedClockRephases = rephases; m_lastClockLogMs = now;
+				diagnostic("clock: plugin relocations " + std::to_string(relocates) + ", re-phases " + std::to_string(rephases)
+					+ "; host-supplied clock bytes " + std::to_string(hostClocks) + ", transport bytes " + std::to_string(hostTransport));
+				m_loggedClockRelocates = relocates; m_loggedClockRephases = rephases;
+				m_loggedHostClocks = hostClocks; m_loggedHostTransport = hostTransport; m_lastClockLogMs = now;
 			}
 		}
 		// The same protocol service also runs from an offline render callback, which

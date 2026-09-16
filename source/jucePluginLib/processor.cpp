@@ -858,6 +858,13 @@ namespace pluginLib
 			if(metadata.numBytes > 3 || metadata.data[0] == synthLib::M_STARTOFSYSEX)
 				++m_realtimeMidiAllocationFallbackCount;
 			synthLib::SMidiEvent ev(synthLib::MidiEventSource::Host);
+			if(metadata.numBytes == 1)
+			{
+				// Diagnostics: realtime clock/transport supplied by the host itself.
+				if(metadata.data[0] == synthLib::M_TIMINGCLOCK) m_hostClockMessages.fetch_add(1, std::memory_order_relaxed);
+				else if(metadata.data[0] == synthLib::M_START || metadata.data[0] == synthLib::M_CONTINUE
+					|| metadata.data[0] == synthLib::M_STOP) m_hostTransportMessages.fetch_add(1, std::memory_order_relaxed);
+			}
 			if(ev.assignRawData(metadata.data, static_cast<size_t>(metadata.numBytes),
 				synthLib::MidiEventSource::Host,
 				static_cast<uint32_t>(std::max(0, metadata.samplePosition))))

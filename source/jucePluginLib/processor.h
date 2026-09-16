@@ -176,6 +176,9 @@ namespace pluginLib
 		std::optional<std::pair<const char*, uint32_t>> findResource(const std::string& _filename) const;
 
 		std::string getDataFolder(bool _useFxFolder = false) const;
+		// Diagnostics: MIDI clock (0xF8) and start/continue/stop bytes received from the host.
+		uint64_t getHostClockMessageCount() const { return m_hostClockMessages.load(std::memory_order_relaxed); }
+		uint64_t getHostTransportMessageCount() const { return m_hostTransportMessages.load(std::memory_order_relaxed); }
 		std::string getPublicRomFolder() const;
 		std::string getConfigFolder(bool _useFxFolder = false) const;
 		std::string getPatchManagerDataFolder(bool _useFxFolder = false) const;
@@ -249,6 +252,8 @@ namespace pluginLib
 		std::unique_ptr<synthLib::Device> m_device;
 		std::unique_ptr<synthLib::Plugin> m_plugin;
 		std::vector<synthLib::SMidiEvent> m_midiOut;
+		std::atomic<uint64_t> m_hostClockMessages{0};
+		std::atomic<uint64_t> m_hostTransportMessages{0};
 
 	private:
 		void requestLatencyUpdate();
