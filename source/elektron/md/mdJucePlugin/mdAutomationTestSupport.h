@@ -19,7 +19,14 @@
 
 namespace mdAutomationTest
 {
-	constexpr int BlockSize = 128;
+	inline int blockSizeFromEnvironment()
+	{
+		const auto* const env = std::getenv("HOST_BLOCKSIZE");
+		const auto value = env ? std::atoi(env) : 128;
+		return value > 0 ? value : 128;
+	}
+	// HOST_BLOCKSIZE overrides the default 128-sample host block for tests.
+	#define BlockSize (mdAutomationTest::blockSizeFromEnvironment())
 	constexpr int SkipReturnCode = 77;
 
 	inline void require(const bool _condition, const std::string& _message)
@@ -108,7 +115,8 @@ namespace mdAutomationTest
 		{
 			if(prepared)
 				return;
-			audioProcessor.prepareToPlay(48000.0, BlockSize);
+			const auto* const rateEnv = std::getenv("HOST_SAMPLERATE");
+			audioProcessor.prepareToPlay(rateEnv ? std::atof(rateEnv) : 48000.0, BlockSize);
 			prepared = true;
 		}
 

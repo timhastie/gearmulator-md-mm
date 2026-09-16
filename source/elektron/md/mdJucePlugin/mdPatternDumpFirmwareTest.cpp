@@ -41,6 +41,37 @@ int main()
 		std::vector<uint8_t> captured;
 		controller.setPatternDumpListener([&captured](const std::vector<uint8_t>& _dump) { captured = _dump; });
 
+		// CLOCKTEST=<bpm>: play the host transport at that tempo for 10 s and count
+		// the MIDI bytes the firmware consumes (24 clock bytes per beat expected).
+		if(const auto* const clockEnv = std::getenv("CLOCKTEST"))
+		{
+			class PlayingPlayHead final : public juce::AudioPlayHead
+			{
+			public:
+				double bpm = 120.0; double ppq = 0.0;
+				juce::Optional<PositionInfo> getPosition() const override
+				{
+					PositionInfo r; r.setIsPlaying(true); r.setIsRecording(false); r.setBpm(bpm); r.setPpqPosition(ppq); return r;
+				}
+			} playHead;
+			playHead.bpm = std::atof(clockEnv);
+			harness.audioProcessor.setPlayHead(&playHead);
+			pump(200);	// let start/continue settle
+			const auto before = harness.telemetry().consumed;
+			const double rate = std::getenv("HOST_SAMPLERATE") ? std::atof(std::getenv("HOST_SAMPLERATE")) : 48000.0;
+			const int blocks = static_cast<int>(10.0 * rate / BlockSize);
+			for(int i = 0; i < blocks; ++i)
+			{
+				playHead.ppq += static_cast<double>(BlockSize) / rate * playHead.bpm / 60.0;
+				pump(1);
+			}
+			const auto after = harness.telemetry().consumed;
+			const double expected = playHead.bpm / 60.0 * 24.0 * 10.0;
+			std::printf("clock test @%.0f Hz: host %.1f bpm for 10 s -> firmware consumed %llu MIDI bytes (expected ~%.0f clock ticks)\n",
+				rate, playHead.bpm, static_cast<unsigned long long>(after - before), expected);
+			return 0;
+		}
+
 		if(model == md::MachineModel::Monomachine)
 		{
 			auto fetchMM = [&]() -> std::optional<md::mmPatternDump::Pattern>
