@@ -12,6 +12,10 @@
 			<label id="labelTrigChance">50 %</label>
 		</div>
 		<settingsspacer1/>
+		<div id="btGrooveMode" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>AFX / AE groove mode</label></div>
+		<settingsspacer1/>
+		<label>Off: every step rolls the trig chance independently. On: each track gets a role (kick, snare, hats, toms, percussion, bass, lead, pad, arp) and its trigs follow classic electro and acid grammars: kicks on the one with syncopated pickups, backbeats with ghosts, offbeat hats, sparse toms with last-bar fills, 303-style bass phrasing. The trig chance slider then acts as overall density. On the Monomachine, notes follow the role too: root, fifth and octave for bass, stepwise walks for leads, chord tones for pads, in the chosen scale.</label>
+		<settingsspacer1/>
 		<h1>Protected From Value Randomization</h1>
 		<settingsspacer1/>
 		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized.</label>

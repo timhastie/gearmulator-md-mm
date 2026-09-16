@@ -42,6 +42,7 @@ set(SOURCES
 	mdSettingsPanelFeel.cpp mdSettingsPanelFeel.h
 	mdSettingsScale.cpp mdSettingsScale.h
 	mdSettingsRandomization.cpp mdSettingsRandomization.h
+	mdGroove.cpp mdGroove.h
 	mdSettingsAudioInput.cpp mdSettingsAudioInput.h
 )
 

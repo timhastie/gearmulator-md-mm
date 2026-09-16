@@ -8,6 +8,7 @@
 #include "mdSettingsScale.h"
 #include "mdSettingsRandomization.h"
 #include "mdRandomizeProtect.h"
+#include "mdGroove.h"
 #include "mdPixelPerfectPanel.h"
 #include "mdLcdViewport.h"
 
@@ -1463,6 +1464,13 @@ namespace mdJucePlugin
 
 		const auto randomTrigs = [&](const uint8_t _track)
 		{
+			if(m_controller.getGrooveMode())
+			{
+				const auto role = groove::roleForMachinedrum(_track, m_controller.getTrackModel(_track));
+				pattern->trigs[_track] = groove::trigs(role, steps, m_controller.getTrigChancePercent() / 50.0, m_random);
+				m_controller.diagnostic("groove: track " + std::to_string(_track + 1) + " as " + groove::roleName(role));
+				return;
+			}
 			std::bernoulli_distribution hit(static_cast<double>(m_controller.getTrigChancePercent()) / 100.0);
 			uint64_t trigs = 0;
 			for(size_t step = 0; step < steps; ++step)
@@ -1596,6 +1604,18 @@ namespace mdJucePlugin
 
 		const auto randomTrigs = [&](const uint8_t _track)
 		{
+			if(m_controller.getGrooveMode())
+			{
+				const auto role = groove::roleForMonomachine(_track);
+				const auto trigs = groove::trigs(role, steps, m_controller.getTrigChancePercent() / 50.0, m_random);
+				pattern->setTrigs(_track, trigs);
+				groove::NoteWalker walker(role, m_scale ? md::scale::scaleMask(m_scale) : 0, m_scaleRoot, m_random);
+				for(size_t step = 0; step < steps; ++step)
+					if(trigs >> step & 1u)
+						pattern->setNote(_track, static_cast<uint8_t>(step), walker.next(step, steps));
+				m_controller.diagnostic("groove: MM track " + std::to_string(_track + 1) + " as " + groove::roleName(role));
+				return;
+			}
 			std::bernoulli_distribution hit(static_cast<double>(m_controller.getTrigChancePercent()) / 100.0);
 			uint64_t trigs = 0;
 			for(size_t step = 0; step < steps; ++step)

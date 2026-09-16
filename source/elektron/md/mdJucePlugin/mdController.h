@@ -117,6 +117,9 @@ namespace mdJucePlugin
 		uint32_t getProtectLocksMask() const { return m_protectLocksMask.load(std::memory_order_acquire); }
 		void setProtectValuesMask(const uint32_t _mask) { m_protectValuesMask.store(_mask, std::memory_order_release); }
 		void setProtectLocksMask(const uint32_t _mask) { m_protectLocksMask.store(_mask, std::memory_order_release); }
+		// AFX/AE groove mode: role-based trig grammars instead of uniform chance.
+		bool getGrooveMode() const { return m_grooveMode.load(std::memory_order_acquire); }
+		void setGrooveMode(const bool _on) { m_grooveMode.store(_on, std::memory_order_release); }
 		// Chance (1..99 %) that a trig receives a lock on a randomized parameter; per instance.
 		static constexpr int g_lockChanceDefault = 50;
 		int getLockChancePercent() const { return m_lockChancePercent.load(std::memory_order_acquire); }
@@ -265,6 +268,7 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
 		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
 		std::atomic<int> m_lockChancePercent{g_lockChanceDefault};
+		std::atomic<bool> m_grooveMode{false};
 		uint64_t m_loggedClockRelocates = 0, m_loggedClockRephases = 0, m_lastClockLogMs = 0;
 		uint64_t m_loggedHostClocks = 0, m_loggedHostTransport = 0, m_loggedTicks = 0;
 		std::atomic<uint32_t> m_protectValuesMask{0xffffffffu};

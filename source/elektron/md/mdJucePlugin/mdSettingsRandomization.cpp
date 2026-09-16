@@ -55,6 +55,22 @@ namespace mdJucePlugin
 			}
 		}
 
+		// Groove mode toggle (controller-backed, per instance).
+		if(auto* const row = juceRmlUi::helper::findChild(_root, "btGrooveMode", false))
+		{
+			if(auto* const button = juceRmlUi::helper::findChildT<juceRmlUi::ElemButton>(row, "button"))
+			{
+				auto& controller = m_editor.getMdController();
+				juceRmlUi::ElemButton::setChecked(button, controller.getGrooveMode());
+				juceRmlUi::EventListener::AddClick(row, [&controller, button]
+				{
+					const bool on = !juceRmlUi::ElemButton::isChecked(button);
+					controller.setGrooveMode(on);
+					juceRmlUi::ElemButton::setChecked(button, on);
+				});
+			}
+		}
+
 		// Protection checkboxes: checked = protected (not randomized / not locked).
 		{
 			auto& controller = m_editor.getMdController();
