@@ -1229,9 +1229,11 @@ namespace mdJucePlugin
 			return m_controller.diagnostic("randomize machine: track " + std::to_string(_track + 1) + " excluded");
 		if(getModel() == md::MachineModel::Monomachine)
 		{
-			// Synth machines only: GND SIN/NOIS, SID, SWAVE SAW/PULS/ENS, FM STAT/PAR/DYN, VO-6.
-			// FX machines (they process neighbours) and DigiPRO (needs waveforms) are skipped.
-			static constexpr uint8_t models[] = { 1, 2, 3, 4, 5, 14, 8, 9, 10, 11 };
+			// Every machine except the silent GND-GND: GND SIN/NOIS, SID, SWAVE
+			// SAW/PULS/ENS, DPRO WAVE/BBOX/DDRW/DENS, FM STAT/PAR/DYN, VO-6, and the
+			// FX machines THRU/REVERB/CHORUS/DYNAMIX/RINGMOD (they process the
+			// neighbouring track's audio).
+			static constexpr uint8_t models[] = { 1, 2, 3, 4, 5, 14, 6, 7, 32, 33, 8, 9, 10, 11, 12, 13, 15, 16, 17 };
 			const auto current = m_controller.getTrackModel(_track) & 0xff;
 			uint8_t model = static_cast<uint8_t>(current);
 			for(int attempt = 0; attempt < 8 && model == current; ++attempt)
