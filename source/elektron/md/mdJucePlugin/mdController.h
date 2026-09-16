@@ -29,6 +29,7 @@ namespace mdJucePlugin
 		void onStateLoaded() override;
 
 		uint8_t getPartCount() const override;
+		md::MachineModel getModel() const { return m_model; }
 
 		bool parseSysexMessage(const pluginLib::SysEx&,
 			synthLib::MidiEventSource) override;
