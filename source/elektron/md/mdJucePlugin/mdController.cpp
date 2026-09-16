@@ -396,8 +396,9 @@ namespace mdJucePlugin
 			if((relocates != m_loggedClockRelocates || rephases != m_loggedClockRephases
 				|| hostClocks != m_loggedHostClocks || hostTransport != m_loggedHostTransport) && now - m_lastClockLogMs > 2000)
 			{
-				diagnostic("clock: plugin relocations " + std::to_string(relocates) + ", re-phases " + std::to_string(rephases)
-					+ "; host-supplied clock bytes " + std::to_string(hostClocks) + ", transport bytes " + std::to_string(hostTransport));
+				diagnostic("clock: relocations " + std::to_string(relocates) + ", host drift blocks " + std::to_string(rephases)
+					+ " (max " + std::to_string(clock.getMaxDriftTicks()) + " ticks); host-supplied clock bytes "
+					+ std::to_string(hostClocks) + ", transport bytes " + std::to_string(hostTransport));
 				m_loggedClockRelocates = relocates; m_loggedClockRephases = rephases;
 				m_loggedHostClocks = hostClocks; m_loggedHostTransport = hostTransport; m_lastClockLogMs = now;
 			}

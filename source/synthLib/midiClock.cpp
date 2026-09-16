@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace synthLib
 {
@@ -26,43 +28,45 @@ namespace synthLib
 			m_lastBpm = _bpm;
 		if(m_lastBpm <= 0) return;
 
-		const auto quartersPerSample = m_lastBpm / (60.0 * rate);
 		const auto samplesPerClock = rate * 60.0 / (m_lastBpm * ClockTicksPerQuarter);
 		const bool positionKnown = _ppqKnown && std::isfinite(_ppqPos) && std::abs(_ppqPos) < 1e12;
-		const auto ppq = positionKnown ? _ppqPos : (m_isPlaying ? m_expectedPpq : 0.0);
-		// Hosts report positions that drift slightly from what the tempo predicts
-		// (delay compensation, fractional tempos, rounding). Absorb anything up to
-		// half a clock tick by re-phasing the tick counter without any transport
-		// message. Only a real jump of a beat or more (loop wrap, seek) relocates
-		// the instrument with STOP / song position / CONTINUE.
+		const auto ppq = positionKnown ? _ppqPos : 0.0;
+
 		if(m_isPlaying && positionKnown)
 		{
-			const auto deviation = std::abs(ppq - m_expectedPpq);
-			const auto rephaseTolerance = std::max(0.5 / ClockTicksPerQuarter, 2 * quartersPerSample);
-			if(deviation >= 1.0)
+			// Where the free-running clock believes the host is, in ticks.
+			const auto ourTicks = static_cast<double>(m_nextClockTick) - m_samplesToNextTick / samplesPerClock;
+			const auto drift = std::abs(ppq * ClockTicksPerQuarter - ourTicks);
+			m_maxDriftTicks = std::max(m_maxDriftTicks, drift);
+			if(drift >= ClockTicksPerQuarter)
 			{
 				++m_relocates;
 				stop();
 			}
-			else if(deviation > rephaseTolerance)
-			{
-				++m_rephases;
-				m_nextClockTick = static_cast<int64_t>(std::ceil(ppq * ClockTicksPerQuarter - 1e-9));
-			}
+			else if(drift > 0.5)
+				++m_driftBlocks;
 		}
-		if(!m_isPlaying) start(ppq);
-
-		for(;; ++m_nextClockTick)
+		if(!m_isPlaying)
 		{
-			const auto distance = (static_cast<double>(m_nextClockTick) - ppq * ClockTicksPerQuarter) * samplesPerClock;
-			// Remove only floating-point noise around exact sample boundaries.
-			// No rounded block lengths or per-sample phase accumulation are used.
-			const auto offset = std::max(0.0, std::ceil(distance - 1e-7));
-			if(offset >= static_cast<double>(_sampleCount)) break;
-			m_plugin.insertMidiEvent({MidiEventSource::Internal, M_TIMINGCLOCK, 0, 0,
-				static_cast<uint32_t>(offset)});
+			start(ppq);
+			// First tick lands exactly on the next 24 PPQN grid line.
+			m_samplesToNextTick = (static_cast<double>(m_nextClockTick) - ppq * ClockTicksPerQuarter) * samplesPerClock;
+			if(m_samplesToNextTick < 0) m_samplesToNextTick = 0;
 		}
-		m_expectedPpq = ppq + static_cast<double>(_sampleCount) * quartersPerSample;
+
+		static const bool trace = std::getenv("GEARMULATOR_CLOCK_TRACE") != nullptr;
+		while(m_samplesToNextTick < static_cast<double>(_sampleCount))
+		{
+			const auto offset = std::max(0.0, std::ceil(m_samplesToNextTick - 1e-7));
+			if(trace)
+				std::fprintf(stderr, "[GEN] tick=%lld ppq=%.6f count=%zu offset=%.0f\n",
+					static_cast<long long>(m_nextClockTick), ppq, _sampleCount, offset);
+			m_plugin.insertMidiEvent({MidiEventSource::Internal, M_TIMINGCLOCK, 0, 0,
+				static_cast<uint32_t>(std::min(offset, static_cast<double>(_sampleCount - 1)))});
+			m_samplesToNextTick += samplesPerClock;
+			++m_nextClockTick;
+		}
+		m_samplesToNextTick -= static_cast<double>(_sampleCount);
 	}
 
 	void MidiClock::restart()

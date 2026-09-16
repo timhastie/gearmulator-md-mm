@@ -15,11 +15,13 @@ namespace synthLib
 		void process(double _bpm, double _ppqPos, bool _isPlaying, size_t _sampleCount, bool _ppqKnown = true);
 
 		void restart();
-		// Diagnostics: small host drifts are absorbed by re-phasing the tick
-		// counter; large jumps (loops, seeks) relocate with STOP/SPP/CONTINUE.
-		uint64_t getRephaseCount() const { return m_rephases; }
+		// Diagnostics. Ticks run free from the tempo; the host position only
+		// detects jumps of a beat or more (loop wrap, seek), which relocate with
+		// STOP / song position / CONTINUE. Blocks whose host position strays more
+		// than half a tick from the free-running phase are counted as drift.
+		uint64_t getRephaseCount() const { return m_driftBlocks; }
 		uint64_t getRelocateCount() const { return m_relocates; }
-
+		double getMaxDriftTicks() const { return m_maxDriftTicks; }
 	private:
 		void stop();
 		void start(double _ppqPos);
@@ -28,9 +30,10 @@ namespace synthLib
 
 		bool m_isPlaying = false;
 		int64_t m_nextClockTick = 0;
-		double m_expectedPpq = 0.0;
+		double m_samplesToNextTick = 0.0;	// free-running phase, in host samples
 		double m_lastBpm = 0.0;
-		uint64_t m_rephases = 0;
+		uint64_t m_driftBlocks = 0;
 		uint64_t m_relocates = 0;
+		double m_maxDriftTicks = 0.0;
 	};
 }

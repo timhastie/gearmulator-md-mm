@@ -1736,9 +1736,14 @@ namespace md
 
 	void Hardware::pumpScheduledMidi()
 	{
+		static const bool trace = std::getenv("GEARMULATOR_CLOCK_TRACE") != nullptr;
 		while(m_scheduledMidi.ready(m_schedUcCyclesDone))
 		{
 			const auto& event = m_scheduledMidi.front().event;
+			if(trace && event.sysex.empty() && event.a == synthLib::M_TIMINGCLOCK)
+				std::fprintf(stderr, "[CLK] release cyc=%llu deadline=%llu\n",
+					static_cast<unsigned long long>(m_schedUcCyclesDone),
+					static_cast<unsigned long long>(m_scheduledMidi.front().cycle));
 			const auto type = static_cast<uint8_t>(event.a & 0xf0);
 			const bool pad = !isMonomachine() && event.sysex.empty()
 				&& (type == synthLib::M_NOTEON || type == synthLib::M_NOTEOFF)
