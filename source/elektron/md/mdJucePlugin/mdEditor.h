@@ -152,6 +152,8 @@ namespace mdJucePlugin
 		void randomizeTrackParameters(uint8_t _track);	// all pages except volume
 		void scheduleTrackParameterRandomization(std::vector<uint8_t> _tracks);
 		bool rollLock();
+		bool parameterProtectedFromValues(uint8_t _track, uint8_t _page, uint8_t _index) const;
+		bool parameterProtectedFromLocks(uint8_t _track, uint8_t _page, uint8_t _index) const;
 		void registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins) override;
 		void servicePendingRandomize(double _nowMilliseconds);
 		std::optional<uint8_t> selectedMachinedrumTrack() const;	// model-aware despite the name

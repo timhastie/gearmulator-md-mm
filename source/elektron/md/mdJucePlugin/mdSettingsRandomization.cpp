@@ -2,6 +2,7 @@
 
 #include "mdEditor.h"
 #include "mdController.h"
+#include "mdRandomizeProtect.h"
 #include "juceRmlUi/rmlElemButton.h"
 
 #include "jucePluginEditorLib/pluginProcessor.h"
@@ -49,6 +50,36 @@ namespace mdJucePlugin
 						const auto include = !juceRmlUi::ElemButton::isChecked(button);
 						controller.setTrackExcluded(aspect, track, !include);
 						juceRmlUi::ElemButton::setChecked(button, include);
+					});
+				}
+			}
+		}
+
+		// Protection checkboxes: checked = protected (not randomized / not locked).
+		{
+			auto& controller = m_editor.getMdController();
+			const auto& list = randomizeProtect::entries(m_editor.getMdController().getModel());
+			const struct { const char* prefix; bool values; } groups[] = { {"pv", true}, {"pl", false} };
+			for(const auto& group : groups)
+			{
+				for(size_t i = 0; i < list.size(); ++i)
+				{
+					auto* const row = juceRmlUi::helper::findChild(_root, group.prefix + std::to_string(i), false);
+					if(!row)
+						continue;
+					auto* const button = juceRmlUi::helper::findChildT<juceRmlUi::ElemButton>(row, "button");
+					if(!button)
+						continue;
+					const bool values = group.values;
+					const auto mask = values ? controller.getProtectValuesMask() : controller.getProtectLocksMask();
+					juceRmlUi::ElemButton::setChecked(button, mask >> i & 1u);
+					juceRmlUi::EventListener::AddClick(row, [&controller, button, values, i]
+					{
+						const bool protect = !juceRmlUi::ElemButton::isChecked(button);
+						auto mask = values ? controller.getProtectValuesMask() : controller.getProtectLocksMask();
+						mask = protect ? mask | 1u << i : mask & ~(1u << i);
+						if(values) controller.setProtectValuesMask(mask); else controller.setProtectLocksMask(mask);
+						juceRmlUi::ElemButton::setChecked(button, protect);
 					});
 				}
 			}

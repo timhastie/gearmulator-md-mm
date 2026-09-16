@@ -108,6 +108,12 @@ namespace mdJucePlugin
 		{
 			m_randomizeExclude[static_cast<size_t>(_aspect)].store(_mask, std::memory_order_release);
 		}
+		// Protection masks for loudness/effect parameters (see mdRandomizeProtect.h);
+		// bit n set = entry n protected. Default: everything protected.
+		uint32_t getProtectValuesMask() const { return m_protectValuesMask.load(std::memory_order_acquire); }
+		uint32_t getProtectLocksMask() const { return m_protectLocksMask.load(std::memory_order_acquire); }
+		void setProtectValuesMask(const uint32_t _mask) { m_protectValuesMask.store(_mask, std::memory_order_release); }
+		void setProtectLocksMask(const uint32_t _mask) { m_protectLocksMask.store(_mask, std::memory_order_release); }
 		// Chance (1..99 %) that a trig receives a lock on a randomized parameter; per instance.
 		static constexpr int g_lockChanceDefault = 50;
 		int getLockChancePercent() const { return m_lockChancePercent.load(std::memory_order_acquire); }
@@ -256,6 +262,8 @@ namespace mdJucePlugin
 		std::array<std::atomic<uint16_t>, 3> m_randomizeExclude{};
 		std::atomic<int> m_trigChancePercent{g_trigChanceDefault};
 		std::atomic<int> m_lockChancePercent{g_lockChanceDefault};
+		std::atomic<uint32_t> m_protectValuesMask{0xffffffffu};
+		std::atomic<uint32_t> m_protectLocksMask{0xffffffffu};
 		std::mutex m_patternDumpListenerLock;
 		std::function<void(const std::vector<uint8_t>&)> m_patternDumpListener;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Controller)

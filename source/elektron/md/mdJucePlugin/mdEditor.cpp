@@ -7,6 +7,7 @@
 #include "mdSettingsPanelFeel.h"
 #include "mdSettingsScale.h"
 #include "mdSettingsRandomization.h"
+#include "mdRandomizeProtect.h"
 #include "mdPixelPerfectPanel.h"
 #include "mdLcdViewport.h"
 
@@ -1260,8 +1261,12 @@ namespace mdJucePlugin
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		if(!page)
 			return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
+		const bool mm = getModel() == md::MachineModel::Monomachine;
+		const uint8_t volumePage = mm ? 1 : 2, volumeIndex = mm ? 5 : 1;
 		for(uint8_t index = 0; index < 8; ++index)
 		{
+			if((*page == volumePage && index == volumeIndex) || parameterProtectedFromValues(*track, *page, index))
+				continue;
 			const auto& parameters = m_controller.findTrackParameters(*track, *page, index);
 			const auto value = randomParameterValue(*track, *page, index);
 			for(auto* const parameter : parameters)
@@ -1328,6 +1333,18 @@ namespace mdJucePlugin
 		scheduleTrackParameterRandomization(std::move(tracks));
 	}
 
+	bool Editor::parameterProtectedFromValues(const uint8_t _track, const uint8_t _page, const uint8_t _index) const
+	{
+		return randomizeProtect::isProtected(getModel(), m_controller.getProtectValuesMask(), _page, _index,
+			m_controller.getTrackModel(_track));
+	}
+
+	bool Editor::parameterProtectedFromLocks(const uint8_t _track, const uint8_t _page, const uint8_t _index) const
+	{
+		return randomizeProtect::isProtected(getModel(), m_controller.getProtectLocksMask(), _page, _index,
+			m_controller.getTrackModel(_track));
+	}
+
 	bool Editor::rollLock()
 	{
 		return std::bernoulli_distribution(static_cast<double>(m_controller.getLockChancePercent()) / 100.0)(m_random);
@@ -1345,7 +1362,7 @@ namespace mdJucePlugin
 		{
 			for(uint8_t index = 0; index < 8; ++index)
 			{
-				if(page == volumePage && index == volumeIndex)
+				if((page == volumePage && index == volumeIndex) || parameterProtectedFromValues(_track, page, index))
 					continue;
 				const auto& parameters = m_controller.findTrackParameters(_track, page, index);
 				const auto value = randomParameterValue(_track, page, index);
@@ -1488,11 +1505,13 @@ namespace mdJucePlugin
 					: std::min<size_t>(md::patternDump::g_classicParams, budget / tracks.size());
 				for(const auto t : tracks)
 				{
-					std::array<uint8_t, md::patternDump::g_classicParams> params{};
-					for(uint8_t i = 0; i < params.size(); ++i) params[i] = i;
+					std::vector<uint8_t> params;
+					for(uint8_t i = 0; i < md::patternDump::g_classicParams; ++i)
+						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)))
+							params.push_back(i);
 					std::shuffle(params.begin(), params.end(), m_random);
 					const auto trigs = pattern->trigs[t] & stepMask;
-					for(size_t i = 0; i < perTrack; ++i)
+					for(size_t i = 0; i < std::min(perTrack, params.size()); ++i)
 					{
 						const auto param = params[i];
 						for(size_t step = 0; step < steps; ++step)
@@ -1537,6 +1556,8 @@ namespace mdJucePlugin
 			const uint8_t count = pending.kind == RandomizeKind::ParamLocks ? 1 : 8;
 			for(uint8_t param = first; param < first + count; ++param)
 			{
+				if(parameterProtectedFromLocks(track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)))
+					continue;
 				for(size_t step = 0; step < steps; ++step)
 				{
 					if(!(trigs >> step & 1u) || !rollLock())
@@ -1589,10 +1610,14 @@ namespace mdJucePlugin
 		{
 			const auto trigs = pattern->trigs(_track) & stepMask;
 			for(const auto param : _params)
+			{
+				if(parameterProtectedFromLocks(_track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)))
+					continue;
 				for(size_t step = 0; step < steps; ++step)
 					if((trigs >> step & 1u) && rollLock() && !pattern->setLock(_track, param, static_cast<uint8_t>(step),
 						randomParameterValue(_track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8))))
 						return false;
+			}
 			return true;
 		};
 
@@ -1652,10 +1677,13 @@ namespace mdJucePlugin
 				const size_t perTrack = tracks.empty() ? 0 : std::min<size_t>(g_params, budget / tracks.size());
 				for(const auto t : tracks)
 				{
-					std::array<uint8_t, g_params> all{};
-					for(uint8_t i = 0; i < all.size(); ++i) all[i] = i;
+					std::vector<uint8_t> all;
+					for(uint8_t i = 0; i < g_params; ++i)
+						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)))
+							all.push_back(i);
 					std::shuffle(all.begin(), all.end(), m_random);
-					(void)lockTrack(t, std::vector<uint8_t>(all.begin(), all.begin() + static_cast<std::ptrdiff_t>(perTrack)));
+					all.resize(std::min(perTrack, all.size()));
+					(void)lockTrack(t, all);
 				}
 			}
 			break;

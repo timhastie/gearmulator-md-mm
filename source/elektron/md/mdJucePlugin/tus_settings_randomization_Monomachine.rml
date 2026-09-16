@@ -12,6 +12,19 @@
 			<label id="labelTrigChance">50 %</label>
 		</div>
 		<settingsspacer1/>
+		<h1>Protected From Value Randomization</h1>
+		<settingsspacer1/>
+		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized.</label>
+		<settingsspacer1/>
+		<div id="pv0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
+		<div id="pv1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DSND)</label></div>
+		<div id="pv2" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Feedback (DFB)</label></div>
+		<div id="pv3" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>EQ Gain (EQG)</label></div>
+		<div id="pv4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Sample Rate Reduction (SRR)</label></div>
+		<div id="pv5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>HP Filter Resonance (HPQ)</label></div>
+		<div id="pv6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LP Filter Resonance (LPQ)</label></div>
+		<div id="pv7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)</label></div>
+		<settingsspacer1/>
 		<h1>Random Parameter Locks</h1>
 		<settingsspacer1/>
 		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the current page, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
@@ -20,6 +33,19 @@
 			<input id="sliderLockChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
 			<label id="labelLockChance">50 %</label>
 		</div>
+		<settingsspacer1/>
+		<h1>Protected From Parameter Locks</h1>
+		<settingsspacer1/>
+		<label>Ticked parameters are never chosen for random parameter locks. Untick to allow locks on one.</label>
+		<settingsspacer1/>
+		<div id="pl0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
+		<div id="pl1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DSND)</label></div>
+		<div id="pl2" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Feedback (DFB)</label></div>
+		<div id="pl3" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>EQ Gain (EQG)</label></div>
+		<div id="pl4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Sample Rate Reduction (SRR)</label></div>
+		<div id="pl5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>HP Filter Resonance (HPQ)</label></div>
+		<div id="pl6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LP Filter Resonance (LPQ)</label></div>
+		<div id="pl7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>
