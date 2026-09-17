@@ -41,6 +41,7 @@
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
+#include "RmlUi/Core/Context.h"
 #include "RmlUi/Core/StringUtilities.h"
 
 #include <algorithm>
@@ -875,7 +876,12 @@ namespace mdJucePlugin
 			};
 			for(const auto& [id, hint] : hints)
 				if(auto* const element = findChild(id, false))
+				{
 					element->SetAttribute("title", hint);
+					if(std::getenv("GEARMULATOR_TOOLTIP_TRACE"))
+						std::fprintf(stderr, "[TIP] label %s at %.0f,%.0f size %.0fx%.0f title='%s'\n", id, element->GetAbsoluteLeft(), element->GetAbsoluteTop(),
+							element->GetBox().GetSize().x, element->GetBox().GetSize().y, hint);
+				}
 			for(int track = 0; track < 6; ++track)
 			{
 				const auto id = std::to_string(track);
@@ -1214,9 +1220,20 @@ namespace mdJucePlugin
 		juceRmlUi::EventListener::Add(document, Rml::EventId::Mouseover, [this](Rml::Event& _event)
 		{
 			Rml::Element* target = _event.GetTargetElement();
+			static const bool trace = std::getenv("GEARMULATOR_TOOLTIP_TRACE") != nullptr;
+			if(trace)
+				std::fprintf(stderr, "[TIP] over id='%s' tag='%s' hasTitle=%d mouse=%.0f,%.0f\n", target ? target->GetId().c_str() : "?",
+					target ? target->GetTagName().c_str() : "?", target ? target->HasAttribute("title") : 0,
+					_event.GetParameter<float>("mouse_x", 0.0f), _event.GetParameter<float>("mouse_y", 0.0f));
+			if(trace)
+				if(auto* const arp = findChild("altArp", false))
+					std::fprintf(stderr, "[TIP] altArp now at %.0f,%.0f size %.0fx%.0f visible=%d\n", arp->GetAbsoluteLeft(), arp->GetAbsoluteTop(),
+						arp->GetBox().GetSize().x, arp->GetBox().GetSize().y, arp->IsVisible(true));
 			while(target && !target->HasAttribute("title"))
 				target = target->GetParentNode();
-			if(target == m_hoverTarget)
+			// Mouseover events for untitled elements (RmlUi also raises one for the
+			// root after some labels) never cancel a pending tooltip; Mouseout does.
+			if(!target || target == m_hoverTarget)
 				return;
 			m_hoverTarget = target;
 			m_hoverStartedMilliseconds = juce::Time::getMillisecondCounterHiRes();
@@ -1240,6 +1257,11 @@ namespace mdJucePlugin
 				m_hoverTooltipShown = false;
 			}
 		});
+		if(std::getenv("GEARMULATOR_TOOLTIP_TRACE"))
+			juceRmlUi::EventListener::Add(document, Rml::EventId::Mousemove, [](Rml::Event& _event)
+			{
+				std::fprintf(stderr, "[TIP] move %.0f,%.0f\n", _event.GetParameter<float>("mouse_x", 0.0f), _event.GetParameter<float>("mouse_y", 0.0f));
+			});
 		juceRmlUi::EventListener::Add(document, Rml::EventId::Mousedown, [this](Rml::Event&)
 		{
 			if(m_hoverTooltipShown)
@@ -1253,6 +1275,34 @@ namespace mdJucePlugin
 
 	void Editor::serviceHoverTooltip(const double _nowMilliseconds)
 	{
+		// Self-test: GEARMULATOR_TOOLTIP_SELFTEST=<elementId> drives the real RmlUi
+		// input pipeline (hit testing included) to that element 3 s after start and
+		// reports whether a tooltip resulted.
+		static const char* const selfTest = std::getenv("GEARMULATOR_TOOLTIP_SELFTEST");
+		static double selfTestAt = 0.0; static int selfTestPhase = 0;
+		if(selfTest && m_hoverTooltip)
+		{
+			if(selfTestAt == 0.0) selfTestAt = _nowMilliseconds + 3000.0;
+			if(selfTestPhase == 0 && _nowMilliseconds >= selfTestAt)
+			{
+				if(auto* const element = findChild(selfTest, false))
+				{
+					auto* const context = getRmlComponent() ? getRmlComponent()->getContext() : nullptr;
+					const auto x = static_cast<int>(element->GetAbsoluteLeft() + element->GetBox().GetSize().x * 0.5f);
+					const auto y = static_cast<int>(element->GetAbsoluteTop() + element->GetBox().GetSize().y * 0.5f);
+					std::fprintf(stderr, "[SELFTEST] moving to %s at %d,%d (context %p)\n", selfTest, x, y, static_cast<void*>(context));
+					if(context) { context->ProcessMouseMove(x - 1, y - 1, 0); context->ProcessMouseMove(x, y, 0); }
+				}
+				else
+					std::fprintf(stderr, "[SELFTEST] element %s not found\n", selfTest);
+				selfTestPhase = 1; selfTestAt = _nowMilliseconds + 1500.0;
+			}
+			else if(selfTestPhase == 1 && _nowMilliseconds >= selfTestAt)
+			{
+				std::fprintf(stderr, "[SELFTEST] result: target=%s shown=%d\n", m_hoverTarget ? m_hoverTarget->GetId().c_str() : "(none)", m_hoverTooltipShown);
+				selfTestPhase = 2;
+			}
+		}
 		if(!m_hoverTooltip || !m_hoverTarget || m_hoverTooltipShown)
 			return;
 		if(_nowMilliseconds - m_hoverStartedMilliseconds < 500.0)
@@ -1265,6 +1315,8 @@ namespace mdJucePlugin
 			return;
 		m_hoverTooltip->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
 		juceRmlUi::helper::setVisible(m_hoverTooltip, true);
+		if(std::getenv("GEARMULATOR_TOOLTIP_TRACE"))
+			std::fprintf(stderr, "[TIP] show id='%s' text='%s'\n", m_hoverTarget->GetId().c_str(), text.c_str());
 		// Position below the element, kept inside the document.
 		auto* const document = getDocument();
 		const auto box = m_hoverTarget->GetBox().GetSize();
