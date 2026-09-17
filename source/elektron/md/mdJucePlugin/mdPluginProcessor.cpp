@@ -118,7 +118,7 @@ namespace mdJucePlugin
 		}
 		{
 			// Randomize exclusions: trigs, machines, locks (one 16-bit track mask each).
-			baseLib::ChunkWriter chunk(_stream, "RXCL", 5);
+			baseLib::ChunkWriter chunk(_stream, "RXCL", 6);
 			for(uint8_t aspect = 0; aspect < 3; ++aspect)
 				_stream.write(controller.getExcludeMask(static_cast<Controller::RandomizeAspect>(aspect)));
 			_stream.write(static_cast<uint8_t>(controller.getTrigChancePercent()));
@@ -126,6 +126,7 @@ namespace mdJucePlugin
 			_stream.write(controller.getProtectValuesMask());
 			_stream.write(controller.getProtectLocksMask());
 			_stream.write(static_cast<uint8_t>(controller.getGrooveMode() ? 1 : 0));
+			_stream.write(static_cast<uint8_t>(controller.getParamChancePercent()));
 		}
 	}
 
@@ -139,7 +140,7 @@ namespace mdJucePlugin
 			auto& controller = dynamic_cast<Controller&>(getController());
 			(void)controller.restoreAutomationSnapshot(snapshot);
 		});
-		_reader.add("RXCL", 5, [this](baseLib::BinaryStream& _stream, const uint32_t _version)
+		_reader.add("RXCL", 6, [this](baseLib::BinaryStream& _stream, const uint32_t _version)
 		{
 			auto& controller = dynamic_cast<Controller&>(getController());
 			for(uint8_t aspect = 0; aspect < 3; ++aspect)
@@ -155,6 +156,8 @@ namespace mdJucePlugin
 			}
 			if(_version >= 5)
 				controller.setGrooveMode(_stream.read<uint8_t>() != 0);
+			if(_version >= 6)
+				controller.setParamChancePercent(_stream.read<uint8_t>());
 		});
 	}
 

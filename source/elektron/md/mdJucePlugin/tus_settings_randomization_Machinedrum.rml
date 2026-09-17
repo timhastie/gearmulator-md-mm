@@ -2,8 +2,7 @@
 <head>
 </head>
 <body>
-	<div class="settings-page">
-		<h1>Random Trigs</h1>
+	<div class="settings-page">		<h1>Random Trigs</h1>
 		<settingsspacer1/>
 		<label>Chance that each step receives a trig when a random-trig chord fires (FUNCTION + DOWN for the selected track, FUNCTION + BANK GROUP or BANK GROUP + YES for every track). Double-click the slider to reset to 50 %. Saved with the plugin state, per instance.</label>
 		<settingsspacer1/>
@@ -16,6 +15,23 @@
 		<settingsspacer1/>
 		<label>Off: every step rolls the trig chance independently. On: each track gets a role (kick, snare, hats, toms, percussion, bass, lead, pad, arp) and its trigs follow classic electro and acid grammars: kicks on the one with syncopated pickups, backbeats with ghosts, offbeat hats, sparse toms with last-bar fills, 303-style bass phrasing. The trig chance slider then acts as overall density. On the Monomachine, notes follow the role too: root, fifth and octave for bass, stepwise walks for leads, chord tones for pads, in the chosen scale.</label>
 		<settingsspacer1/>
+		<h1>Random Parameter Locks</h1>
+		<settingsspacer1/>
+		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the current page, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
+		<settingsspacer1/>
+		<div class="settings-hlayout">
+			<input id="sliderLockChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
+			<label id="labelLockChance">50 %</label>
+		</div>
+		<settingsspacer1/>
+		<label>Chance that a parameter is considered at all for random locks. At 100 % every unprotected parameter is a candidate; lower it so a low lock chance also means fewer parameters touched. Double-click to reset to 100 %.</label>
+		<settingsspacer1/>
+		<div class="settings-hlayout">
+			<input id="sliderParamChance" class="settings-slider-h" type="range" min="1" max="100" step="1" value="100" style="width: 90%;"/>
+			<label id="labelParamChance">100 %</label>
+		</div>
+		<settingsspacer1/>
+
 		<h1>Protected From Value Randomization</h1>
 		<settingsspacer1/>
 		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized. The Machinedrum's LFO page is never randomized: its settings are not reachable by the randomizer.</label>
@@ -28,15 +44,6 @@
 		<div id="pv5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Sample Rate Reduction (SRR)</label></div>
 		<div id="pv6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amplitude Mod Depth (AMD)</label></div>
 		<div id="pv7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
-		<settingsspacer1/>
-		<h1>Random Parameter Locks</h1>
-		<settingsspacer1/>
-		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the current page, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
-		<settingsspacer1/>
-		<div class="settings-hlayout">
-			<input id="sliderLockChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
-			<label id="labelLockChance">50 %</label>
-		</div>
 		<settingsspacer1/>
 		<h1>Protected From Parameter Locks</h1>
 		<settingsspacer1/>

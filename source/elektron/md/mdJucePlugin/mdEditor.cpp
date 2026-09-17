@@ -1543,6 +1543,12 @@ namespace mdJucePlugin
 			m_controller.getTrackModel(_track));
 	}
 
+	bool Editor::rollParameter()
+	{
+		const auto percent = m_controller.getParamChancePercent();
+		return percent >= 100 || std::bernoulli_distribution(static_cast<double>(percent) / 100.0)(m_random);
+	}
+
 	bool Editor::rollLock()
 	{
 		return std::bernoulli_distribution(static_cast<double>(m_controller.getLockChancePercent()) / 100.0)(m_random);
@@ -1713,7 +1719,7 @@ namespace mdJucePlugin
 				{
 					std::vector<uint8_t> params;
 					for(uint8_t i = 0; i < md::patternDump::g_classicParams; ++i)
-						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)))
+						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)) && rollParameter())
 							params.push_back(i);
 					std::shuffle(params.begin(), params.end(), m_random);
 					const auto trigs = pattern->trigs[t] & stepMask;
@@ -1763,6 +1769,8 @@ namespace mdJucePlugin
 			for(uint8_t param = first; param < first + count; ++param)
 			{
 				if(parameterProtectedFromLocks(track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)))
+					continue;
+				if(count > 1 && !rollParameter())
 					continue;
 				for(size_t step = 0; step < steps; ++step)
 				{
@@ -1859,7 +1867,7 @@ namespace mdJucePlugin
 				// budget is what remains after the other tracks' rows.
 				pattern->clearTrackLocks(_pending.track);
 				for(uint8_t i = 0; i < g_params; ++i)
-					if(!parameterProtectedFromLocks(_pending.track, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)))
+					if(!parameterProtectedFromLocks(_pending.track, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)) && rollParameter())
 						params.push_back(i);
 				std::shuffle(params.begin(), params.end(), m_random);
 				const size_t budget = g_maxRows - std::min(pattern->rowCount(), g_maxRows);
@@ -1908,7 +1916,7 @@ namespace mdJucePlugin
 				{
 					std::vector<uint8_t> all;
 					for(uint8_t i = 0; i < g_params; ++i)
-						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)))
+						if(!parameterProtectedFromLocks(t, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)) && rollParameter())
 							all.push_back(i);
 					std::shuffle(all.begin(), all.end(), m_random);
 					all.resize(std::min(perTrack, all.size()));

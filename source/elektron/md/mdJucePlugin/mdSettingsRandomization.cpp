@@ -139,5 +139,7 @@ namespace mdJucePlugin
 			&Controller::setTrigChancePercent, Controller::g_trigChanceDefault);
 		bindSlider("sliderLockChance", "labelLockChance", &Controller::getLockChancePercent,
 			&Controller::setLockChancePercent, Controller::g_lockChanceDefault);
+		bindSlider("sliderParamChance", "labelParamChance", &Controller::getParamChancePercent,
+			&Controller::setParamChancePercent, Controller::g_paramChanceDefault);
 	}
 }

@@ -152,6 +152,7 @@ namespace mdJucePlugin
 		void randomizeTrackParameters(uint8_t _track);	// all pages except volume
 		void scheduleTrackParameterRandomization(std::vector<uint8_t> _tracks);
 		bool rollLock();
+		bool rollParameter();	// whether a parameter is considered for random locks at all
 		bool parameterProtectedFromValues(uint8_t _track, uint8_t _page, uint8_t _index) const;
 		bool parameterProtectedFromLocks(uint8_t _track, uint8_t _page, uint8_t _index) const;
 		void registerSettings(std::vector<std::unique_ptr<jucePluginEditorLib::SettingsPlugin>>& _plugins) override;
