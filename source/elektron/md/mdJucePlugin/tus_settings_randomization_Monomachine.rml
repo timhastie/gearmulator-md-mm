@@ -18,7 +18,7 @@
 		<settingsspacer1/>
 		<h1>Protected From Value Randomization</h1>
 		<settingsspacer1/>
-		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized.</label>
+		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized. The last two entries are constraints rather than exclusions: ticked, the filter and amp envelope are still randomized but within bands that keep the track audible; unticked, they are fully random.</label>
 		<settingsspacer1/>
 		<div id="pv0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
 		<div id="pv1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DSND)</label></div>
@@ -29,6 +29,8 @@
 		<div id="pv6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LP Filter Resonance (LPQ)</label></div>
 		<div id="pv7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)</label></div>
 		<div id="pv8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
+		<div id="pv9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter window kept open (BASE low, WIDTH at least half, offsets mild)</label></div>
+		<div id="pv10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amp envelope kept audible (short ATK, DEC and REL not tiny)</label></div>
 		<settingsspacer1/>
 		<h1>Random Parameter Locks</h1>
 		<settingsspacer1/>
@@ -52,6 +54,8 @@
 		<div id="pl6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LP Filter Resonance (LPQ)</label></div>
 		<div id="pl7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)</label></div>
 		<div id="pl8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
+		<div id="pl9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter window kept open (BASE low, WIDTH at least half, offsets mild)</label></div>
+		<div id="pl10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amp envelope kept audible (short ATK, DEC and REL not tiny)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>

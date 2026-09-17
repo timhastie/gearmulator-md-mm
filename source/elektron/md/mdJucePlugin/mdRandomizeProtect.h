@@ -21,6 +21,10 @@ namespace mdJucePlugin::randomizeProtect
 		uint8_t index;		// parameter index on that page
 	};
 	constexpr uint8_t g_fxMachineRule = 255;
+	// Constraint rules: the parameter is still randomized, but inside a band that
+	// keeps the track audible. Applied through constrainedValue() below.
+	constexpr uint8_t g_filterWindowRule = 254;	// MM FILTER page 2: BASE 0, WIDTH 1, BOFS 6, WOFS 7
+	constexpr uint8_t g_ampEnvelopeRule = 253;		// MM AMP page 1: ATK 0, DEC 2, REL 3
 
 	inline const std::vector<Entry>& entries(const md::MachineModel _model)
 	{
@@ -46,6 +50,8 @@ namespace mdJucePlugin::randomizeProtect
 			{"LP Filter Resonance (LPQ)", 2, 3},
 			{"FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)", g_fxMachineRule, 0},
 			{"Pan (PAN)", 1, 6},
+			{"Filter window kept open (BASE, WIDTH, BOFS, WOFS constrained)", g_filterWindowRule, 0},
+			{"Amp envelope kept audible (ATK short, DEC and REL not tiny)", g_ampEnvelopeRule, 0},
 		};
 		return _model == md::MachineModel::Monomachine ? monomachine : machinedrum;
 	}
@@ -54,6 +60,47 @@ namespace mdJucePlugin::randomizeProtect
 	{
 		const auto model = _kitModel & 0xff;
 		return _kitModel != 0xffffffffu && (model == 12 || model == 13 || model == 15 || model == 16 || model == 17);
+	}
+
+	// Constraint rules for MM randomization. Returns the value to use for a
+	// parameter given the freely rolled _random value (0..127), or _random when no
+	// rule applies. _mask is the values-protection mask.
+	inline uint8_t constrainedValue(const md::MachineModel _model, const uint32_t _mask,
+		const uint8_t _page, const uint8_t _index, const uint8_t _random)
+	{
+		if(_model != md::MachineModel::Monomachine)
+			return _random;
+		const auto& list = entries(_model);
+		auto ruleOn = [&](const uint8_t _rule)
+		{
+			for(size_t i = 0; i < list.size(); ++i)
+				if(list[i].page == _rule && (_mask >> i & 1u))
+					return true;
+			return false;
+		};
+		const auto band = [&](const int _lo, const int _hi) { return static_cast<uint8_t>(_lo + (_random * (_hi - _lo + 1)) / 128); };
+		if(_page == 2 && ruleOn(g_filterWindowRule))
+		{
+			switch(_index)
+			{
+			case 0: return band(0, 64);		// BASE in the lower half
+			case 1: return band(64, 127);	// WIDTH at least half open
+			case 6: return band(48, 80);	// BOFS mild around centre (64)
+			case 7: return band(48, 80);	// WOFS mild around centre
+			default: break;
+			}
+		}
+		if(_page == 1 && ruleOn(g_ampEnvelopeRule))
+		{
+			switch(_index)
+			{
+			case 0: return band(0, 24);		// ATK short
+			case 2: return band(24, 127);	// DEC not tiny
+			case 3: return band(16, 127);	// REL not tiny
+			default: break;
+			}
+		}
+		return _random;
 	}
 
 	// _mask bit n set = entry n is protected.
@@ -71,6 +118,8 @@ namespace mdJucePlugin::randomizeProtect
 				if(_page == 0 && _model == md::MachineModel::Monomachine && isMonomachineFxMachine(_trackKitModel))
 					return true;
 			}
+			else if(e.page == g_filterWindowRule || e.page == g_ampEnvelopeRule)
+				continue;	// constraint rules never exclude
 			else if(e.page == _page && e.index == _index)
 				return true;
 		}

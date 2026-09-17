@@ -2648,7 +2648,8 @@ namespace mdJucePlugin
 		if(getModel() == md::MachineModel::Machinedrum && _page == 0 && _index == 0)
 			if(const auto context = scaleContextForTrack(_track))
 				return md::scale::random(context->tuning, context->mask, context->root, m_random);
-		return static_cast<uint8_t>(std::uniform_int_distribution<int>(0, 127)(m_random));
+		const auto raw = static_cast<uint8_t>(std::uniform_int_distribution<int>(0, 127)(m_random));
+		return randomizeProtect::constrainedValue(getModel(), m_controller.getProtectValuesMask(), _page, _index, raw);
 	}
 
 	void Editor::emitEncoderSteps(const md::PanelEncoder _encoder, const int _steps) const
