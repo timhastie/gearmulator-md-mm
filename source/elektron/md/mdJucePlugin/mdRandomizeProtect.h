@@ -33,6 +33,7 @@ namespace mdJucePlugin::randomizeProtect
 			{"Filter Q (FLTQ)", 1, 6},
 			{"Sample Rate Reduction (SRR)", 1, 7},
 			{"Amplitude Mod Depth (AMD)", 1, 0},
+			{"Pan (PAN)", 2, 2},
 		};
 		static const std::vector<Entry> monomachine =
 		{
@@ -44,6 +45,7 @@ namespace mdJucePlugin::randomizeProtect
 			{"HP Filter Resonance (HPQ)", 2, 2},
 			{"LP Filter Resonance (LPQ)", 2, 3},
 			{"FX machine settings (SYNTH page of THRU, REVERB, CHORUS, DYNAMIX, RINGMOD)", g_fxMachineRule, 0},
+			{"Pan (PAN)", 1, 6},
 		};
 		return _model == md::MachineModel::Monomachine ? monomachine : machinedrum;
 	}

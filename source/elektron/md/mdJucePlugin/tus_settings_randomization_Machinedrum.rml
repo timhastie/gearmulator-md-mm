@@ -27,6 +27,7 @@
 		<div id="pv4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Q (FLTQ)</label></div>
 		<div id="pv5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Sample Rate Reduction (SRR)</label></div>
 		<div id="pv6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amplitude Mod Depth (AMD)</label></div>
+		<div id="pv7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
 		<settingsspacer1/>
 		<h1>Random Parameter Locks</h1>
 		<settingsspacer1/>
@@ -48,6 +49,7 @@
 		<div id="pl4" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Q (FLTQ)</label></div>
 		<div id="pl5" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Sample Rate Reduction (SRR)</label></div>
 		<div id="pl6" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amplitude Mod Depth (AMD)</label></div>
+		<div id="pl7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>
