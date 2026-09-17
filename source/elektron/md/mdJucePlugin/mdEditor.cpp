@@ -41,6 +41,7 @@
 
 #include "RmlUi/Core/Element.h"
 #include "RmlUi/Core/ElementDocument.h"
+#include "RmlUi/Core/StringUtilities.h"
 
 #include <algorithm>
 #include <cmath>
@@ -641,6 +642,7 @@ namespace mdJucePlugin
 						releasePanelButtonGestures();
 				});
 			applyScaleQuantizer();
+			createHoverTooltip();
 			m_controller.setPatternDumpListener(
 				[this, token = std::weak_ptr<void>(m_lifetimeToken)](const std::vector<uint8_t>& _dump)
 				{
@@ -1169,6 +1171,100 @@ namespace mdJucePlugin
 		event.sysex.insert(event.sysex.end(), body.begin(), body.end());
 		event.sysex.push_back(0xf7);
 		getProcessor().addMidiEvent(event);
+	}
+
+	void Editor::createHoverTooltip()
+	{
+		auto* const document = getDocument();
+		if(!document || m_hoverTooltip)
+			return;
+		auto tooltip = document->CreateElement("div");
+		tooltip->SetProperty("position", "absolute");
+		tooltip->SetProperty("z-index", "1000");
+		tooltip->SetProperty("pointer-events", "none");
+		tooltip->SetProperty("background-color", "#111111ee");
+		tooltip->SetProperty("color", "#f0f0f0");
+		tooltip->SetProperty("font-family", "Roboto");
+		tooltip->SetProperty("font-size", "12dp");
+		tooltip->SetProperty("padding", "6dp 8dp");
+		tooltip->SetProperty("border-radius", "4dp");
+		tooltip->SetProperty("max-width", "360dp");
+		tooltip->SetProperty("white-space", "normal");
+		tooltip->SetProperty("line-height", "1.3");
+		m_hoverTooltip = document->AppendChild(std::move(tooltip));
+		juceRmlUi::helper::setVisible(m_hoverTooltip, false);
+
+		// Track the element under the pointer that carries a title.
+		juceRmlUi::EventListener::Add(document, Rml::EventId::Mouseover, [this](Rml::Event& _event)
+		{
+			Rml::Element* target = _event.GetTargetElement();
+			while(target && !target->HasAttribute("title"))
+				target = target->GetParentNode();
+			if(target == m_hoverTarget)
+				return;
+			m_hoverTarget = target;
+			m_hoverStartedMilliseconds = juce::Time::getMillisecondCounterHiRes();
+			if(m_hoverTooltipShown)
+			{
+				juceRmlUi::helper::setVisible(m_hoverTooltip, false);
+				m_hoverTooltipShown = false;
+			}
+		});
+		juceRmlUi::EventListener::Add(document, Rml::EventId::Mouseout, [this](Rml::Event& _event)
+		{
+			Rml::Element* target = _event.GetTargetElement();
+			while(target && !target->HasAttribute("title"))
+				target = target->GetParentNode();
+			if(target != m_hoverTarget)
+				return;
+			m_hoverTarget = nullptr;
+			if(m_hoverTooltipShown)
+			{
+				juceRmlUi::helper::setVisible(m_hoverTooltip, false);
+				m_hoverTooltipShown = false;
+			}
+		});
+		juceRmlUi::EventListener::Add(document, Rml::EventId::Mousedown, [this](Rml::Event&)
+		{
+			if(m_hoverTooltipShown)
+			{
+				juceRmlUi::helper::setVisible(m_hoverTooltip, false);
+				m_hoverTooltipShown = false;
+			}
+			m_hoverStartedMilliseconds = juce::Time::getMillisecondCounterHiRes() + 1e9;	// not until re-hover
+		});
+	}
+
+	void Editor::serviceHoverTooltip(const double _nowMilliseconds)
+	{
+		if(!m_hoverTooltip || !m_hoverTarget || m_hoverTooltipShown)
+			return;
+		if(_nowMilliseconds - m_hoverStartedMilliseconds < 500.0)
+			return;
+		const auto* const attribute = m_hoverTarget->GetAttribute("title");
+		if(!attribute)
+			return;
+		const auto text = attribute->Get<Rml::String>(m_hoverTarget->GetCoreInstance());
+		if(text.empty())
+			return;
+		m_hoverTooltip->SetInnerRML(Rml::StringUtilities::EncodeRml(text));
+		juceRmlUi::helper::setVisible(m_hoverTooltip, true);
+		// Position below the element, kept inside the document.
+		auto* const document = getDocument();
+		const auto box = m_hoverTarget->GetBox().GetSize();
+		float x = m_hoverTarget->GetAbsoluteLeft();
+		float y = m_hoverTarget->GetAbsoluteTop() + box.y + 4.0f;
+		const auto docWidth = document->GetClientWidth();
+		const auto docHeight = document->GetClientHeight();
+		m_hoverTooltip->SetProperty(Rml::PropertyId::Left, Rml::Property(x, Rml::Unit::PX));
+		m_hoverTooltip->SetProperty(Rml::PropertyId::Top, Rml::Property(y, Rml::Unit::PX));
+		document->UpdateDocument();
+		const auto size = m_hoverTooltip->GetBox().GetSize();
+		if(x + size.x > docWidth) x = std::max(0.0f, docWidth - size.x - 4.0f);
+		if(y + size.y > docHeight) y = std::max(0.0f, m_hoverTarget->GetAbsoluteTop() - size.y - 4.0f);
+		m_hoverTooltip->SetProperty(Rml::PropertyId::Left, Rml::Property(x, Rml::Unit::PX));
+		m_hoverTooltip->SetProperty(Rml::PropertyId::Top, Rml::Property(y, Rml::Unit::PX));
+		m_hoverTooltipShown = true;
 	}
 
 	void Editor::showRandomizeMessage(const std::string& _message) const
@@ -2917,6 +3013,7 @@ namespace mdJucePlugin
 
 		const auto nowMilliseconds = juce::Time::getMillisecondCounterHiRes();
 		servicePendingRandomize(nowMilliseconds);
+		serviceHoverTooltip(nowMilliseconds);
 		const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
 		if(m_encoderPress.active() && (!modifiers.isAltDown() || !modifiers.isLeftButtonDown()))
 			releaseEncoderPress();

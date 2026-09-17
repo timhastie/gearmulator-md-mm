@@ -168,6 +168,14 @@ namespace mdJucePlugin
 		static bool holdKeyDown();
 		void serviceShiftFunction();
 		bool m_shiftFunctionHeld = false;
+		// Hover tooltips for elements carrying a "title" attribute (RmlUi does not
+		// render them itself). Shown after a short delay next to the element.
+		void createHoverTooltip();
+		void serviceHoverTooltip(double _nowMilliseconds);
+		Rml::Element* m_hoverTooltip = nullptr;
+		Rml::Element* m_hoverTarget = nullptr;
+		double m_hoverStartedMilliseconds = 0.0;
+		bool m_hoverTooltipShown = false;
 		void showRandomizeMessage(const std::string& _message) const;
 		struct ScaleContext
 		{
