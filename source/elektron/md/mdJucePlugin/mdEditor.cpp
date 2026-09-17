@@ -608,9 +608,7 @@ namespace mdJucePlugin
 				}
 				// Only second-key buttons carry hover text; hold-first keys stay silent.
 				if(!hint.empty())
-					b->SetAttribute("title", hint);
-				else
-					b->RemoveAttribute("title");
+					b->SetAttribute("combo", hint);
 			}
 
 			juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
@@ -877,7 +875,7 @@ namespace mdJucePlugin
 			for(const auto& [id, hint] : hints)
 				if(auto* const element = findChild(id, false))
 				{
-					element->SetAttribute("title", hint);
+					element->SetAttribute("combo", hint);
 					if(std::getenv("GEARMULATOR_TOOLTIP_TRACE"))
 						std::fprintf(stderr, "[TIP] label %s at %.0f,%.0f size %.0fx%.0f title='%s'\n", id, element->GetAbsoluteLeft(), element->GetAbsoluteTop(),
 							element->GetBox().GetSize().x, element->GetBox().GetSize().y, hint);
@@ -887,7 +885,7 @@ namespace mdJucePlugin
 				const auto id = std::to_string(track);
 				for(const auto& prefix : { panelAffordances::g_drumLedPrefix, panelAffordances::g_trackLabelPrefix })
 					if(auto* const element = findChild((prefix + id).c_str(), false))
-						element->SetAttribute("title", "Z-hold BANK then this track key: random machine and parameters on that track.");
+						element->SetAttribute("combo", "Z-hold BANK then this track key: random machine and parameters on that track.");
 			}
 		}
 
@@ -1222,14 +1220,14 @@ namespace mdJucePlugin
 			Rml::Element* target = _event.GetTargetElement();
 			static const bool trace = std::getenv("GEARMULATOR_TOOLTIP_TRACE") != nullptr;
 			if(trace)
-				std::fprintf(stderr, "[TIP] over id='%s' tag='%s' hasTitle=%d mouse=%.0f,%.0f\n", target ? target->GetId().c_str() : "?",
-					target ? target->GetTagName().c_str() : "?", target ? target->HasAttribute("title") : 0,
+				std::fprintf(stderr, "[TIP] over id='%s' tag='%s' hasCombo=%d mouse=%.0f,%.0f\n", target ? target->GetId().c_str() : "?",
+					target ? target->GetTagName().c_str() : "?", target ? target->HasAttribute("combo") : 0,
 					_event.GetParameter<float>("mouse_x", 0.0f), _event.GetParameter<float>("mouse_y", 0.0f));
 			if(trace)
 				if(auto* const arp = findChild("altArp", false))
 					std::fprintf(stderr, "[TIP] altArp now at %.0f,%.0f size %.0fx%.0f visible=%d\n", arp->GetAbsoluteLeft(), arp->GetAbsoluteTop(),
 						arp->GetBox().GetSize().x, arp->GetBox().GetSize().y, arp->IsVisible(true));
-			while(target && !target->HasAttribute("title"))
+			while(target && !target->HasAttribute("combo"))
 				target = target->GetParentNode();
 			// Mouseover events for untitled elements (RmlUi also raises one for the
 			// root after some labels) never cancel a pending tooltip; Mouseout does.
@@ -1246,7 +1244,7 @@ namespace mdJucePlugin
 		juceRmlUi::EventListener::Add(document, Rml::EventId::Mouseout, [this](Rml::Event& _event)
 		{
 			Rml::Element* target = _event.GetTargetElement();
-			while(target && !target->HasAttribute("title"))
+			while(target && !target->HasAttribute("combo"))
 				target = target->GetParentNode();
 			if(target != m_hoverTarget)
 				return;
@@ -1307,7 +1305,7 @@ namespace mdJucePlugin
 			return;
 		if(_nowMilliseconds - m_hoverStartedMilliseconds < 500.0)
 			return;
-		const auto* const attribute = m_hoverTarget->GetAttribute("title");
+		const auto* const attribute = m_hoverTarget->GetAttribute("combo");
 		if(!attribute)
 			return;
 		const auto text = attribute->Get<Rml::String>(m_hoverTarget->GetCoreInstance());
@@ -2658,7 +2656,7 @@ namespace mdJucePlugin
 						? " Shift+click: snap the track's trig notes to the scale."
 						: " Shift+click: snap the track's PTCH locks to the scale.";
 				title += "  (Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn)";
-				_knob->SetAttribute("title", title);
+				_knob->SetAttribute("combo", title);
 			}
 			juceRmlUi::EventListener::Add(_knob, Rml::EventId::Mousedown,
 				[this, _knob, packet, _encoder](Rml::Event& _event)
