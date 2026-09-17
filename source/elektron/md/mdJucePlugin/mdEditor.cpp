@@ -573,12 +573,46 @@ namespace mdJucePlugin
 				continue;
 			}
 
-			if(isTrigger(pb.control))
-				b->SetAttribute("title",
-					"Z-click to hold this trig; release Z to let go. Shift holds FUNCTION.");
-			else
-				b->SetAttribute("title",
-					"Z-click to hold; use another control; release Z to let go. Shift holds FUNCTION.");
+			{
+				// Combo reminders for keys that act as the second key of a chord.
+				const bool mm = model == md::MachineModel::Monomachine;
+				std::string hint;
+				switch(pb.control)
+				{
+				case md::PanelControl::Up:
+					hint = "Shift+UP: random locks, current page, selected track. Z-hold YES then UP: randomize page values. Z-hold UP then click an encoder: random locks on that parameter.";
+					break;
+				case md::PanelControl::Down:
+					hint = "Shift+DOWN: random trigs on the selected track.";
+					break;
+				case md::PanelControl::Enter:
+					hint = mm ? "Z-hold YES then click UP: randomize the current page's values."
+						: "Z-hold BANK GROUP then YES: random machines, trigs and locks on every track. Z-hold YES then UP: randomize page values.";
+					break;
+				case md::PanelControl::Exit:
+					hint = mm ? "" : "Z-hold BANK GROUP then NO: random machine and parameters on every track.";
+					break;
+				case md::PanelControl::ClassicExtended:
+					hint = mm ? "" : "Shift+CLASSIC/EXTENDED: random locks on every trig of every track.";
+					break;
+				case md::PanelControl::BankA: hint = mm ? "Z-hold BANK then ARP: random trigs on every track." : ""; break;
+				case md::PanelControl::BankB: hint = mm ? "Z-hold BANK then TRANSP: random locks on every trig of every track." : ""; break;
+				case md::PanelControl::BankC: hint = mm ? "Z-hold BANK then SWING: random machine and parameters on every track." : ""; break;
+				case md::PanelControl::BankD: hint = mm ? "Z-hold BANK then SLIDE: random machines, trigs and locks on every track." : ""; break;
+				default:
+					if(isTrigger(pb.control) && !mm)
+						hint = "Z-hold BANK GROUP then this trig: random machine and parameters on that track.";
+					else if(pb.control >= md::PanelControl::Track1 && pb.control <= md::PanelControl::Track6 && mm)
+						hint = "Z-hold BANK then this track key: random machine and parameters on that track.";
+					break;
+				}
+				std::string title = isTrigger(pb.control)
+					? "Z-click to hold this trig; release Z to let go. Shift holds FUNCTION."
+					: "Z-click to hold; use another control; release Z to let go. Shift holds FUNCTION.";
+				if(!hint.empty())
+					title = hint + "  (" + title + ")";
+				b->SetAttribute("title", title);
+			}
 
 			juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 				[this, b, packet, control = pb.control](Rml::Event& _event)
@@ -2453,7 +2487,15 @@ namespace mdJucePlugin
 		if(const auto packet = md::panelEncoderPressPacket(getModel(), _encoder))
 		{
 			_knob->SetAttribute("speedScaleAlt", 1.0f);
-			_knob->SetAttribute("title", "Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn; hold UP and click for random locks on every trig; FUNCTION + A snaps PTCH locks to the scale");
+			{
+				std::string title = "Z-hold UP then click: random locks on this parameter for every trig.";
+				if(_encoder == md::PanelEncoder::DataEntryA)
+					title += getModel() == md::MachineModel::Monomachine
+						? " Shift+click: snap the track's trig notes to the scale."
+						: " Shift+click: snap the track's PTCH locks to the scale.";
+				title += "  (Drag to turn; Alt/Option-click to press; Alt/Option-drag to press and turn)";
+				_knob->SetAttribute("title", title);
+			}
 			juceRmlUi::EventListener::Add(_knob, Rml::EventId::Mousedown,
 				[this, _knob, packet, _encoder](Rml::Event& _event)
 				{

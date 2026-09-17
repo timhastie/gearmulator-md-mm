@@ -25,6 +25,7 @@ namespace mdJucePlugin::randomizeProtect
 	// keeps the track audible. Applied through constrainedValue() below.
 	constexpr uint8_t g_filterWindowRule = 254;	// MM FILTER page 2: BASE 0, WIDTH 1, BOFS 6, WOFS 7
 	constexpr uint8_t g_ampEnvelopeRule = 253;		// MM AMP page 1: ATK 0, DEC 2, REL 3
+	constexpr uint8_t g_lfoPagesRule = 252;			// MM LFO pages 4..6 (the MD LFO is not reachable by the randomizer)
 
 	inline const std::vector<Entry>& entries(const md::MachineModel _model)
 	{
@@ -52,6 +53,7 @@ namespace mdJucePlugin::randomizeProtect
 			{"Pan (PAN)", 1, 6},
 			{"Filter window kept open (BASE, WIDTH, BOFS, WOFS constrained)", g_filterWindowRule, 0},
 			{"Amp envelope kept audible (ATK short, DEC and REL not tiny)", g_ampEnvelopeRule, 0},
+			{"LFO settings (LFO 1, 2, 3 pages)", g_lfoPagesRule, 0},
 		};
 		return _model == md::MachineModel::Monomachine ? monomachine : machinedrum;
 	}
@@ -83,8 +85,8 @@ namespace mdJucePlugin::randomizeProtect
 		{
 			switch(_index)
 			{
-			case 0: return band(0, 64);		// BASE in the lower half
-			case 1: return band(64, 127);	// WIDTH at least half open
+			case 0: return band(0, 36);		// BASE low: the passband starts in the bass/low-mid region
+			case 1: return band(80, 127);	// WIDTH wide open
 			case 6: return band(48, 80);	// BOFS mild around centre (64)
 			case 7: return band(48, 80);	// WOFS mild around centre
 			default: break;
@@ -116,6 +118,11 @@ namespace mdJucePlugin::randomizeProtect
 			if(e.page == g_fxMachineRule)
 			{
 				if(_page == 0 && _model == md::MachineModel::Monomachine && isMonomachineFxMachine(_trackKitModel))
+					return true;
+			}
+			else if(e.page == g_lfoPagesRule)
+			{
+				if(_model == md::MachineModel::Monomachine && _page >= 4 && _page <= 6)
 					return true;
 			}
 			else if(e.page == g_filterWindowRule || e.page == g_ampEnvelopeRule)
