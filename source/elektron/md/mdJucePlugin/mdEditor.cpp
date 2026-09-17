@@ -551,8 +551,6 @@ namespace mdJucePlugin
 			if(model == md::MachineModel::Monomachine
 				&& panelAffordances::isPatternBank(pb.control))
 			{
-				b->SetAttribute("title",
-					"Click to hold this bank until a trig; Z uses the same bank latch");
 				juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 					[this, b, packet, control = pb.control](Rml::Event& _event)
 				{
@@ -607,12 +605,11 @@ namespace mdJucePlugin
 						hint = "Z-hold BANK then this track key: random machine and parameters on that track.";
 					break;
 				}
-				std::string title = isTrigger(pb.control)
-					? "Z-click to hold this trig; release Z to let go. Shift holds FUNCTION."
-					: "Z-click to hold; use another control; release Z to let go. Shift holds FUNCTION.";
+				// Only second-key buttons carry hover text; hold-first keys stay silent.
 				if(!hint.empty())
-					title = hint + "  (" + title + ")";
-				b->SetAttribute("title", title);
+					b->SetAttribute("title", hint);
+				else
+					b->RemoveAttribute("title");
 			}
 
 			juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
@@ -868,6 +865,25 @@ namespace mdJucePlugin
 		}
 
 		bindChordList(panelAffordances::g_monomachineShortcuts);
+		{
+			const std::pair<const char*, const char*> hints[] =
+			{
+				{ "altArp", "Z-hold BANK then ARP: random trigs on every track." },
+				{ "altTransp", "Z-hold BANK then TRANSP: random locks on every trig of every track." },
+				{ "altSwing", "Z-hold BANK then SWING: random machine and parameters on every track." },
+				{ "altSlide", "Z-hold BANK then SLIDE: random machines, trigs and locks on every track." },
+			};
+			for(const auto& [id, hint] : hints)
+				if(auto* const element = findChild(id, false))
+					element->SetAttribute("title", hint);
+			for(int track = 0; track < 6; ++track)
+			{
+				const auto id = std::to_string(track);
+				for(const auto& prefix : { panelAffordances::g_drumLedPrefix, panelAffordances::g_trackLabelPrefix })
+					if(auto* const element = findChild((prefix + id).c_str(), false))
+						element->SetAttribute("title", "Z-hold BANK then this track key: random machine and parameters on that track.");
+			}
+		}
 
 		for(size_t page = 0; page < panelAffordances::g_monomachineDataPages.size(); ++page)
 			bindPage(panelAffordances::g_monomachineDataPages[page],
