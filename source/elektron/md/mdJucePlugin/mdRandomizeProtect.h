@@ -41,6 +41,7 @@ namespace mdJucePlugin::randomizeProtect
 			{"Pan (PAN)", 2, 2},
 			{"Filter Frequency (FLTF)", 1, 4},
 			{"Filter Width (FLTW)", 1, 5},
+			{"Volume (VOL)", 2, 1},
 		};
 		static const std::vector<Entry> monomachine =
 		{
@@ -58,6 +59,7 @@ namespace mdJucePlugin::randomizeProtect
 			{"LFO settings (LFO 1, 2, 3 pages)", g_lfoPagesRule, 0},
 			{"Filter Base (BASE)", 2, 0},
 			{"Filter Width (WIDTH)", 2, 1},
+			{"Volume (VOL)", 1, 5},
 		};
 		return _model == md::MachineModel::Monomachine ? monomachine : machinedrum;
 	}
@@ -108,6 +110,29 @@ namespace mdJucePlugin::randomizeProtect
 		}
 		return _random;
 	}
+
+	// Monomachine LFO routing. PAGE (LFO page index 0) selects the target page in
+	// value bands (PTCH, SYNTH, AMP, FILT, EFFX, LFO1-3, MIDI); DEST (index 1)
+	// selects the parameter within it in bands of 16.
+	inline int mmLfoPageFromValue(const uint8_t _value)
+	{
+		// -1 = PTCH, 0..6 = SYNTH..LFO3, 7 = MIDI
+		if(_value < 14) return -1;
+		if(_value < 28) return 0;
+		if(_value < 42) return 1;
+		if(_value < 56) return 2;
+		if(_value < 70) return 3;
+		if(_value < 85) return 4;
+		if(_value < 99) return 5;
+		if(_value < 113) return 6;
+		return 7;
+	}
+	inline uint8_t mmLfoPageValue(const int _page)
+	{
+		static const uint8_t centres[] = {7, 21, 35, 49, 63, 78, 92, 106, 120};
+		return centres[_page + 1];
+	}
+	inline uint8_t mmLfoDestValue(const uint8_t _index) { return static_cast<uint8_t>(_index * 16 + 8); }
 
 	// _mask bit n set = entry n is protected.
 	inline bool isProtected(const md::MachineModel _model, const uint32_t _mask,

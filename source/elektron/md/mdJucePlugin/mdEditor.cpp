@@ -1479,11 +1479,9 @@ namespace mdJucePlugin
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
 		if(!page)
 			return showRandomizeMessage("Select the SYNTHESIS, EFFECTS or ROUTING page first.");
-		const bool mm = getModel() == md::MachineModel::Monomachine;
-		const uint8_t volumePage = mm ? 1 : 2, volumeIndex = mm ? 5 : 1;
 		for(uint8_t index = 0; index < 8; ++index)
 		{
-			if((*page == volumePage && index == volumeIndex) || parameterProtectedFromValues(*track, *page, index))
+			if(parameterProtectedFromValues(*track, *page, index))
 				continue;
 			const auto& parameters = m_controller.findTrackParameters(*track, *page, index);
 			const auto value = randomParameterValue(*track, *page, index);
@@ -1491,6 +1489,8 @@ namespace mdJucePlugin
 				parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
 					pluginLib::Parameter::Origin::Ui);
 		}
+		if(getModel() == md::MachineModel::Monomachine && *page >= 4)
+			steerMonomachineLfo(*track, *page);
 	}
 
 	void Editor::randomizeTrackMachine(const uint8_t _track)
@@ -1559,6 +1559,10 @@ namespace mdJucePlugin
 
 	bool Editor::parameterProtectedFromLocks(const uint8_t _track, const uint8_t _page, const uint8_t _index) const
 	{
+		// MM LFO PAGE/DEST are routing selectors: a random lock there could aim an
+		// LFO at a protected parameter mid-pattern, so they are never locked.
+		if(getModel() == md::MachineModel::Monomachine && _page >= 4 && _index <= 1)
+			return true;
 		return randomizeProtect::isProtected(getModel(), m_controller.getProtectLocksMask(), _page, _index,
 			m_controller.getTrackModel(_track));
 	}
@@ -1581,12 +1585,11 @@ namespace mdJucePlugin
 		// MM: SYNTH, AMP, FILTER, EFFECTS, LFO1-3 (VOL is AMP index 5).
 		const bool mm = getModel() == md::MachineModel::Monomachine;
 		const uint8_t pages = mm ? 7 : 3;
-		const uint8_t volumePage = mm ? 1 : 2, volumeIndex = mm ? 5 : 1;
 		for(uint8_t page = 0; page < pages; ++page)
 		{
 			for(uint8_t index = 0; index < 8; ++index)
 			{
-				if((page == volumePage && index == volumeIndex) || parameterProtectedFromValues(_track, page, index))
+				if(parameterProtectedFromValues(_track, page, index))
 					continue;
 				const auto& parameters = m_controller.findTrackParameters(_track, page, index);
 				const auto value = randomParameterValue(_track, page, index);
@@ -1594,7 +1597,48 @@ namespace mdJucePlugin
 					parameter->setUnnormalizedValueNotifyingHost(static_cast<int>(value),
 						pluginLib::Parameter::Origin::Ui);
 			}
+			if(mm && page >= 4)
+				steerMonomachineLfo(_track, page);
 		}
+	}
+
+	void Editor::steerMonomachineLfo(const uint8_t _track, const uint8_t _lfoPage)
+	{
+		// If the LFO's PAGE/DEST were randomized, make sure the target parameter
+		// is not protected from value randomization; re-aim at a random
+		// unprotected parameter otherwise. Values are only written for
+		// PAGE/DEST when they are themselves unprotected.
+		if(parameterProtectedFromValues(_track, _lfoPage, 0) && parameterProtectedFromValues(_track, _lfoPage, 1))
+			return;
+		const auto& pageParams = m_controller.findTrackParameters(_track, _lfoPage, 0);
+		const auto& destParams = m_controller.findTrackParameters(_track, _lfoPage, 1);
+		if(pageParams.empty() || destParams.empty())
+			return;
+		auto targetPage = randomizeProtect::mmLfoPageFromValue(static_cast<uint8_t>(std::clamp<int>(pageParams.front()->getUnnormalizedValue(), 0, 127)));
+		auto targetIndex = static_cast<uint8_t>(std::clamp<int>(destParams.front()->getUnnormalizedValue(), 0, 127) / 16);
+		const auto protectedTarget = [&](const int _page, const uint8_t _index)
+		{
+			return _page >= 0 && _page <= 6 && parameterProtectedFromValues(_track, static_cast<uint8_t>(_page), _index);
+		};
+		if(!protectedTarget(targetPage, targetIndex))
+			return;
+		for(int attempt = 0; attempt < 32; ++attempt)
+		{
+			const int page = std::uniform_int_distribution<int>(-1, 3)(m_random);	// PTCH, SYNTH, AMP, FILT, EFFX
+			const auto index = static_cast<uint8_t>(std::uniform_int_distribution<int>(0, 7)(m_random));
+			if(protectedTarget(page, index))
+				continue;
+			targetPage = page; targetIndex = index;
+			break;
+		}
+		if(!parameterProtectedFromValues(_track, _lfoPage, 0))
+			for(auto* const parameter : pageParams)
+				parameter->setUnnormalizedValueNotifyingHost(randomizeProtect::mmLfoPageValue(targetPage), pluginLib::Parameter::Origin::Ui);
+		if(!parameterProtectedFromValues(_track, _lfoPage, 1))
+			for(auto* const parameter : destParams)
+				parameter->setUnnormalizedValueNotifyingHost(randomizeProtect::mmLfoDestValue(targetIndex), pluginLib::Parameter::Origin::Ui);
+		m_controller.diagnostic("randomize: LFO page " + std::to_string(_lfoPage - 3) + " on track " + std::to_string(_track + 1)
+			+ " re-aimed away from a protected parameter");
 	}
 
 	void Editor::scheduleTrackParameterRandomization(std::vector<uint8_t> _tracks)

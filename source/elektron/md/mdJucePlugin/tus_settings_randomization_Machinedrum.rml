@@ -34,7 +34,7 @@
 
 		<h1>Protected From Value Randomization</h1>
 		<settingsspacer1/>
-		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized. The Machinedrum's LFO page is never randomized: its settings are not reachable by the randomizer.</label>
+		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Untick to let one be randomized. The Machinedrum's LFO page is never randomized: its settings are not reachable by the randomizer.</label>
 		<settingsspacer1/>
 		<div id="pv0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
 		<div id="pv1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DEL)</label></div>
@@ -46,6 +46,7 @@
 		<div id="pv7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
 		<div id="pv8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Frequency (FLTF)</label></div>
 		<div id="pv9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (FLTW)</label></div>
+		<div id="pv10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Volume (VOL)</label></div>
 		<settingsspacer1/>
 		<h1>Protected From Parameter Locks</h1>
 		<settingsspacer1/>
@@ -61,6 +62,7 @@
 		<div id="pl7" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Pan (PAN)</label></div>
 		<div id="pl8" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Frequency (FLTF)</label></div>
 		<div id="pl9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (FLTW)</label></div>
+		<div id="pl10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Volume (VOL)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>

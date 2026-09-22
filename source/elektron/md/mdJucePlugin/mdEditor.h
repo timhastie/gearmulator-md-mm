@@ -149,7 +149,8 @@ namespace mdJucePlugin
 		void randomizePageParameters();
 		void randomizeTrackMachine(uint8_t _track);
 		void randomizeAllMachines();
-		void randomizeTrackParameters(uint8_t _track);	// all pages except volume
+		void randomizeTrackParameters(uint8_t _track);	// all pages, protected parameters skipped
+		void steerMonomachineLfo(uint8_t _track, uint8_t _lfoPage);
 		void scheduleTrackParameterRandomization(std::vector<uint8_t> _tracks);
 		bool rollLock();
 		bool rollParameter();	// whether a parameter is considered for random locks at all

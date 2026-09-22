@@ -34,7 +34,7 @@
 
 		<h1>Protected From Value Randomization</h1>
 		<settingsspacer1/>
-		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Volume is never randomized. Untick to let one be randomized. The last two entries are constraints rather than exclusions: ticked, the filter and amp envelope are still randomized but within bands that keep the track audible; unticked, they are fully random.</label>
+		<label>Ticked parameters keep their value when a random machine is assigned or YES + UP randomizes a page. Untick to let one be randomized. The last two entries are constraints rather than exclusions: ticked, the filter and amp envelope are still randomized but within bands that keep the track audible; unticked, they are fully random.</label>
 		<settingsspacer1/>
 		<div id="pv0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
 		<div id="pv1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DSND)</label></div>
@@ -50,10 +50,11 @@
 		<div id="pv11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LFO settings (LFO 1, 2, 3 pages)</label></div>
 		<div id="pv12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Base (BASE)</label></div>
 		<div id="pv13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (WIDTH)</label></div>
+		<div id="pv14" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Volume (VOL)</label></div>
 		<settingsspacer1/>
 		<h1>Protected From Parameter Locks</h1>
 		<settingsspacer1/>
-		<label>Ticked parameters are never chosen for random parameter locks. Untick to allow locks on one.</label>
+		<label>Ticked parameters are never chosen for random parameter locks. Untick to allow locks on one. LFO PAGE and DEST are never locked, and a randomized LFO is re-aimed if it would modulate a parameter protected from value randomization.</label>
 		<settingsspacer1/>
 		<div id="pl0" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Distortion (DIST)</label></div>
 		<div id="pl1" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Delay Send (DSND)</label></div>
@@ -69,6 +70,7 @@
 		<div id="pl11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LFO settings (LFO 1, 2, 3 pages)</label></div>
 		<div id="pl12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Base (BASE)</label></div>
 		<div id="pl13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (WIDTH)</label></div>
+		<div id="pl14" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Volume (VOL)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>
