@@ -44,6 +44,7 @@ namespace mdJucePlugin
 	{
 		for(auto& model : m_trackModels)
 			model.store(0xffffffffu, std::memory_order_relaxed);
+		applyRandomizeDefaults();
 		registerParams(_p, [](const uint8_t _part, const bool _nonPartSensitive)
 		{
 			return _nonPartSensitive ? juce::String("Global")
@@ -356,6 +357,30 @@ namespace mdJucePlugin
 			return false;
 		sendSysexToDevice(md::automation::sysex::kitSave(m_model, kit));
 		return true;
+	}
+
+	void Controller::applyRandomizeDefaults()
+	{
+		setTrigChancePercent(defaultTrigChancePercent());
+		setParamChancePercent(defaultParamChancePercent());
+		setLockChancePercent(g_lockChanceDefault);
+		setProtectValuesMask(0xffffffffu);
+		if(m_model == md::MachineModel::Machinedrum)
+		{
+			// Locks may touch filter frequency and width (protection list entries 8, 9).
+			setProtectLocksMask(0xffffffffu & ~(1u << 8) & ~(1u << 9));
+			setGrooveMode(true);
+			// Tracks 1 and 2 are left alone by every randomize gesture.
+			for(uint8_t aspect = 0; aspect < 3; ++aspect)
+				setExcludeMask(static_cast<RandomizeAspect>(aspect), 0x0003);
+		}
+		else
+		{
+			setProtectLocksMask(0xffffffffu);
+			setGrooveMode(false);
+			for(uint8_t aspect = 0; aspect < 3; ++aspect)
+				setExcludeMask(static_cast<RandomizeAspect>(aspect), 0);
+		}
 	}
 
 	void Controller::setSysexListener(std::function<void(const std::vector<uint8_t>&)> _listener)

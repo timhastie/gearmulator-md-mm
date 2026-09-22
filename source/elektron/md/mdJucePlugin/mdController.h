@@ -124,6 +124,10 @@ namespace mdJucePlugin
 		{
 			m_paramChancePercent.store(std::clamp(_percent, 1, 100), std::memory_order_release);
 		}
+		// Per-model defaults for a fresh instance (see applyRandomizeDefaults()).
+		int defaultTrigChancePercent() const { return m_model == md::MachineModel::Machinedrum ? 35 : g_trigChanceDefault; }
+		int defaultParamChancePercent() const { return m_model == md::MachineModel::Machinedrum ? 35 : g_paramChanceDefault; }
+		void applyRandomizeDefaults();
 		// AFX/AE groove mode: role-based trig grammars instead of uniform chance.
 		bool getGrooveMode() const { return m_grooveMode.load(std::memory_order_acquire); }
 		void setGrooveMode(const bool _on) { m_grooveMode.store(_on, std::memory_order_release); }

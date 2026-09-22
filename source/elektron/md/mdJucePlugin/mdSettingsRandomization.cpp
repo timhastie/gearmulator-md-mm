@@ -136,10 +136,10 @@ namespace mdJucePlugin
 			});
 		};
 		bindSlider("sliderTrigChance", "labelTrigChance", &Controller::getTrigChancePercent,
-			&Controller::setTrigChancePercent, Controller::g_trigChanceDefault);
+			&Controller::setTrigChancePercent, controller.defaultTrigChancePercent());
 		bindSlider("sliderLockChance", "labelLockChance", &Controller::getLockChancePercent,
 			&Controller::setLockChancePercent, Controller::g_lockChanceDefault);
 		bindSlider("sliderParamChance", "labelParamChance", &Controller::getParamChancePercent,
-			&Controller::setParamChancePercent, Controller::g_paramChanceDefault);
+			&Controller::setParamChancePercent, controller.defaultParamChancePercent());
 	}
 }

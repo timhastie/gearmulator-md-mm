@@ -4,7 +4,7 @@
 <body>
 	<div class="settings-page">		<h1>Random Trigs</h1>
 		<settingsspacer1/>
-		<label>Chance that each step receives a trig when a random-trig chord fires (FUNCTION + DOWN for the selected track, FUNCTION + BANK GROUP or BANK GROUP + YES for every track). Double-click the slider to reset to 50 %. Saved with the plugin state, per instance.</label>
+		<label>Chance that each step receives a trig when a random-trig chord fires (FUNCTION + DOWN for the selected track, FUNCTION + BANK GROUP or BANK GROUP + YES for every track). Double-click the slider to reset to 35 %. Saved with the plugin state, per instance.</label>
 		<settingsspacer1/>
 		<div class="settings-hlayout">
 			<input id="sliderTrigChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
@@ -24,7 +24,7 @@
 			<label id="labelLockChance">50 %</label>
 		</div>
 		<settingsspacer1/>
-		<label>Chance that a parameter is considered at all for random locks. At 100 % every unprotected parameter is a candidate; lower it so a low lock chance also means fewer parameters touched. Double-click to reset to 100 %.</label>
+		<label>Chance that a parameter is considered at all for random locks. At 100 % every unprotected parameter is a candidate; lower it so a low lock chance also means fewer parameters touched. Double-click to reset to 35 %.</label>
 		<settingsspacer1/>
 		<div class="settings-hlayout">
 			<input id="sliderParamChance" class="settings-slider-h" type="range" min="1" max="100" step="1" value="100" style="width: 90%;"/>
