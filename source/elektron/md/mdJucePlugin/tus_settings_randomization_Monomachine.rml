@@ -48,6 +48,8 @@
 		<div id="pv9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter window kept open (BASE low, WIDTH at least half, offsets mild)</label></div>
 		<div id="pv10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amp envelope kept audible (short ATK, DEC and REL not tiny)</label></div>
 		<div id="pv11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LFO settings (LFO 1, 2, 3 pages)</label></div>
+		<div id="pv12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Base (BASE)</label></div>
+		<div id="pv13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (WIDTH)</label></div>
 		<settingsspacer1/>
 		<h1>Protected From Parameter Locks</h1>
 		<settingsspacer1/>
@@ -65,6 +67,8 @@
 		<div id="pl9" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter window kept open (BASE low, WIDTH at least half, offsets mild)</label></div>
 		<div id="pl10" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Amp envelope kept audible (short ATK, DEC and REL not tiny)</label></div>
 		<div id="pl11" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>LFO settings (LFO 1, 2, 3 pages)</label></div>
+		<div id="pl12" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Base (BASE)</label></div>
+		<div id="pl13" class="settings-checkboxwithlabel"><button id="button" class="settings-checkbox"/><label>Filter Width (WIDTH)</label></div>
 		<settingsspacer1/>
 		<h1>Include Tracks</h1>
 		<settingsspacer1/>

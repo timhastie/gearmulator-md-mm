@@ -39,6 +39,8 @@ namespace mdJucePlugin::randomizeProtect
 			{"Sample Rate Reduction (SRR)", 1, 7},
 			{"Amplitude Mod Depth (AMD)", 1, 0},
 			{"Pan (PAN)", 2, 2},
+			{"Filter Frequency (FLTF)", 1, 4},
+			{"Filter Width (FLTW)", 1, 5},
 		};
 		static const std::vector<Entry> monomachine =
 		{
@@ -54,6 +56,8 @@ namespace mdJucePlugin::randomizeProtect
 			{"Filter window kept open (BASE, WIDTH, BOFS, WOFS constrained)", g_filterWindowRule, 0},
 			{"Amp envelope kept audible (ATK short, DEC and REL not tiny)", g_ampEnvelopeRule, 0},
 			{"LFO settings (LFO 1, 2, 3 pages)", g_lfoPagesRule, 0},
+			{"Filter Base (BASE)", 2, 0},
+			{"Filter Width (WIDTH)", 2, 1},
 		};
 		return _model == md::MachineModel::Monomachine ? monomachine : machinedrum;
 	}
