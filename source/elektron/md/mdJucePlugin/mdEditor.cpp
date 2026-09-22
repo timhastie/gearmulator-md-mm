@@ -601,9 +601,9 @@ namespace mdJucePlugin
 				case md::PanelControl::BankD: hint = mm ? "Z-hold BANK then SLIDE: random machines, trigs and locks on every track." : ""; break;
 				default:
 					if(isTrigger(pb.control) && !mm)
-						hint = "Z-hold BANK GROUP then this trig: random machine and parameters on that track.";
+						hint = "Z-hold BANK GROUP then this trig: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.";
 					else if(pb.control >= md::PanelControl::Track1 && pb.control <= md::PanelControl::Track6 && mm)
-						hint = "Z-hold BANK then this track key: random machine and parameters on that track.";
+						hint = "Z-hold BANK then this track key: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.";
 					break;
 				}
 				// Only second-key buttons carry hover text; hold-first keys stay silent.
@@ -733,6 +733,8 @@ namespace mdJucePlugin
 					randomizeTrackMachine(track);
 					if(!m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, track))
 						scheduleTrackParameterRandomization({track});
+					if(functionHeld)
+						beginPatternRandomize(RandomizeKind::TrackEverything, track);
 					return;
 				}
 			}
@@ -756,6 +758,8 @@ namespace mdJucePlugin
 					randomizeTrackMachine(track);
 					if(!m_controller.isTrackExcluded(Controller::RandomizeAspect::Machines, track))
 						scheduleTrackParameterRandomization({track});
+					if(functionHeld)
+						beginPatternRandomize(RandomizeKind::TrackEverything, track);
 					return;
 				}
 			}
@@ -885,7 +889,7 @@ namespace mdJucePlugin
 				const auto id = std::to_string(track);
 				for(const auto& prefix : { panelAffordances::g_drumLedPrefix, panelAffordances::g_trackLabelPrefix })
 					if(auto* const element = findChild((prefix + id).c_str(), false))
-						element->SetAttribute("combo", "Z-hold BANK then this track key: random machine and parameters on that track.");
+						element->SetAttribute("combo", "Z-hold BANK then this track key: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.");
 			}
 		}
 
@@ -1605,10 +1609,11 @@ namespace mdJucePlugin
 		applyScaleQuantizer();
 		const bool wholePattern = _kind == RandomizeKind::AllTrigs
 			|| _kind == RandomizeKind::AllLocks || _kind == RandomizeKind::Everything;
-		const auto track = wholePattern ? std::optional<uint8_t>(0) : selectedMachinedrumTrack();
+		const auto track = wholePattern ? std::optional<uint8_t>(0)
+			: _kind == RandomizeKind::TrackEverything ? _param : selectedMachinedrumTrack();
 		if(!track)
 			return showRandomizeMessage("Could not determine the selected track from the panel LEDs.");
-		if(!wholePattern)
+		if(!wholePattern && _kind != RandomizeKind::TrackEverything)
 		{
 			const auto aspect = _kind == RandomizeKind::Trigs ? Controller::RandomizeAspect::Trigs
 				: Controller::RandomizeAspect::Locks;
@@ -1618,7 +1623,7 @@ namespace mdJucePlugin
 		uint8_t page = 0;
 		if(_kind == RandomizeKind::QuantizeLocks && m_scale == 0)
 			return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
-		const bool allPages = _kind == RandomizeKind::PageLocks;
+		const bool allPages = _kind == RandomizeKind::PageLocks || _kind == RandomizeKind::TrackEverything;
 		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks && !wholePattern && !allPages)
 		{
 			const auto active = activeMachinedrumPage();
@@ -1735,6 +1740,35 @@ namespace mdJucePlugin
 		}
 		else if(pending.kind == RandomizeKind::Trigs)
 			randomTrigs(track);
+		else if(pending.kind == RandomizeKind::TrackEverything)
+		{
+			using Aspect = Controller::RandomizeAspect;
+			if(!m_controller.isTrackExcluded(Aspect::Trigs, track))
+				randomTrigs(track);
+			if(!m_controller.isTrackExcluded(Aspect::Locks, track) && (pattern->trigs[track] & stepMask))
+			{
+				for(uint8_t p = md::patternDump::g_classicParams; p-- > 0;)
+				{
+					if(!pattern->hasLock(track, p))
+						continue;
+					pattern->rows.erase(pattern->rows.begin() + static_cast<std::ptrdiff_t>(pattern->rowIndex(track, p)));
+					pattern->lockMasks[track] &= ~(1ull << p);
+				}
+				std::vector<uint8_t> params;
+				for(uint8_t p = 0; p < md::patternDump::g_classicParams; ++p)
+					if(!parameterProtectedFromLocks(track, static_cast<uint8_t>(p / 8), static_cast<uint8_t>(p % 8)) && rollParameter())
+						params.push_back(p);
+				std::shuffle(params.begin(), params.end(), m_random);
+				const size_t budget = md::patternDump::g_maxRows - std::min(pattern->rows.size(), md::patternDump::g_maxRows);
+				if(params.size() > budget) params.resize(budget);
+				const auto trigs = pattern->trigs[track] & stepMask;
+				for(const auto param : params)
+					for(size_t step = 0; step < steps; ++step)
+						if((trigs >> step & 1u) && rollLock())
+							(void)pattern->setLock(track, param, static_cast<uint8_t>(step),
+								randomParameterValue(track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)));
+			}
+		}
 		else if(pending.kind == RandomizeKind::QuantizeLocks)
 		{
 			const auto context = scaleContextForTrack(track);
@@ -1868,6 +1902,24 @@ namespace mdJucePlugin
 		case RandomizeKind::Trigs:
 			randomTrigs(_pending.track);
 			break;
+		case RandomizeKind::TrackEverything:
+		{
+			if(!m_controller.isTrackExcluded(Aspect::Trigs, _pending.track))
+				randomTrigs(_pending.track);
+			if(!m_controller.isTrackExcluded(Aspect::Locks, _pending.track) && (pattern->trigs(_pending.track) & stepMask))
+			{
+				pattern->clearTrackLocks(_pending.track);
+				std::vector<uint8_t> params;
+				for(uint8_t i = 0; i < g_params; ++i)
+					if(!parameterProtectedFromLocks(_pending.track, static_cast<uint8_t>(i / 8), static_cast<uint8_t>(i % 8)) && rollParameter())
+						params.push_back(i);
+				std::shuffle(params.begin(), params.end(), m_random);
+				const size_t budget = g_maxRows - std::min(pattern->rowCount(), g_maxRows);
+				if(params.size() > budget) params.resize(budget);
+				(void)lockTrack(_pending.track, params);
+			}
+			break;
+		}
 		case RandomizeKind::PageLocks:
 		case RandomizeKind::ParamLocks:
 		{

@@ -135,7 +135,7 @@ namespace mdJucePlugin
 		void selectMachinedrumTrack(int _track);
 		// Randomize gestures (Machinedrum only). Pattern edits round-trip the
 		// current pattern through a SysEx dump so the firmware owns the result.
-		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks, AllTrigs, AllLocks, Everything };
+		enum class RandomizeKind { Trigs, PageLocks, ParamLocks, QuantizeLocks, AllTrigs, AllLocks, Everything, TrackEverything };
 		struct PendingRandomize
 		{
 			RandomizeKind kind;
