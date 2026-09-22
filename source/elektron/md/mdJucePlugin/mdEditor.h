@@ -169,6 +169,7 @@ namespace mdJucePlugin
 		static bool holdKeyDown();
 		void serviceShiftFunction();
 		bool m_shiftFunctionHeld = false;
+		double m_holdKeyUpSinceMilliseconds = 0.0;
 		// Hover tooltips for elements carrying a "title" attribute (RmlUi does not
 		// render them itself). Shown after a short delay next to the element.
 		void createHoverTooltip();

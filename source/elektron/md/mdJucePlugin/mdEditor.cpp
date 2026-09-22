@@ -555,7 +555,8 @@ namespace mdJucePlugin
 				juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 					[this, b, packet, control = pb.control](Rml::Event& _event)
 				{
-					const bool shiftDown = holdKeyDown();
+					const bool shiftDown = holdKeyDown() || (!m_shiftPanelLatch.empty()
+						&& juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown());
 					if(!shiftDown && !m_shiftPanelLatch.empty())
 						releasePanelButtonGestures();
 					if(panelAffordances::usesPersistentPatternBankLatch(getModel(),
@@ -614,7 +615,8 @@ namespace mdJucePlugin
 			juceRmlUi::EventListener::Add(b, Rml::EventId::Mousedown,
 				[this, b, packet, control = pb.control](Rml::Event& _event)
 			{
-				pressPanelButton(b, control, *packet, holdKeyDown());
+				pressPanelButton(b, control, *packet, holdKeyDown() || (!m_shiftPanelLatch.empty()
+					&& juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown()));
 			});
 
 			// Mouseout releases too, otherwise dragging off a button leaves it held.
@@ -633,8 +635,12 @@ namespace mdJucePlugin
 				{
 					if(!juceRmlUi::helper::getKeyModAlt(_event))
 						releaseEncoderPress();
+					// A Z key-up ends the latch, except while Shift is down: pressing Shift
+					// mid-hold makes some hosts report the Z key as re-pressed with a
+					// different character, which must not break a BANK + FUNCTION chord.
 					if(juceRmlUi::helper::getKeyIdentifier(_event) == Rml::Input::KI_Z
-						&& !m_shiftPanelLatch.empty())
+						&& !m_shiftPanelLatch.empty()
+						&& !juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown())
 						releasePanelButtonGestures();
 				});
 			applyScaleQuantizer();
@@ -3174,8 +3180,20 @@ namespace mdJucePlugin
 			releaseEncoderPress();
 		// Some plugin hosts can lose the modifier key-up when focus changes. Poll
 		// native state as a fail-safe so no panel row remains held indefinitely.
-		if(!m_shiftPanelLatch.empty() && !holdKeyDown())
-			releasePanelButtonGestures();
+		// Release only after Z has read as up for a while with Shift also up, so a
+		// Shift press during a Z hold never drops the latched button.
+		if(!m_shiftPanelLatch.empty() && !holdKeyDown() && !modifiers.isShiftDown())
+		{
+			if(m_holdKeyUpSinceMilliseconds == 0.0)
+				m_holdKeyUpSinceMilliseconds = nowMilliseconds;
+			else if(nowMilliseconds - m_holdKeyUpSinceMilliseconds > 250.0)
+			{
+				releasePanelButtonGestures();
+				m_holdKeyUpSinceMilliseconds = 0.0;
+			}
+		}
+		else
+			m_holdKeyUpSinceMilliseconds = 0.0;
 		serviceShiftFunction();
 
 		const auto hadFrontPanelSnapshot = m_frontPanelSnapshotValid;
