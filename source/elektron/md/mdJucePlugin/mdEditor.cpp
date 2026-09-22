@@ -158,9 +158,12 @@ namespace mdJucePlugin
 	Editor::~Editor()
 	{
 		m_controller.setPatternDumpListener({});
-		if(m_shiftFunctionHeld)
+		for(const auto& [held, control] : { std::pair{m_shiftFunctionHeld, md::PanelControl::Function},
+			std::pair{m_aBankHeld, md::PanelControl::BankGroup} })
 		{
-			if(const auto packet = md::panelPacket(getModel(), md::PanelControl::Function))
+			if(!held)
+				continue;
+			if(const auto packet = md::panelPacket(getModel(), control))
 			{
 				const auto combined = m_panelRows.release(*packet);
 				(void)sendPanelEvent(combined.row, combined.mask);
@@ -588,23 +591,23 @@ namespace mdJucePlugin
 					break;
 				case md::PanelControl::Enter:
 					hint = mm ? "Z-hold YES then click UP: randomize the current page's values."
-						: "Z-hold BANK GROUP then YES: random machines, trigs and locks on every track. Z-hold YES then UP: randomize page values.";
+						: "Hold A (BANK GROUP) then YES: random machines, trigs and locks on every track. Z-hold YES then UP: randomize page values.";
 					break;
 				case md::PanelControl::Exit:
-					hint = mm ? "" : "Z-hold BANK GROUP then NO: random machine and parameters on every track.";
+					hint = mm ? "" : "Hold A (BANK GROUP) then NO: random machine and parameters on every track.";
 					break;
 				case md::PanelControl::ClassicExtended:
 					hint = mm ? "" : "Shift+CLASSIC/EXTENDED: random locks on every trig of every track.";
 					break;
-				case md::PanelControl::BankA: hint = mm ? "Z-hold BANK then ARP: random trigs on every track." : ""; break;
-				case md::PanelControl::BankB: hint = mm ? "Z-hold BANK then TRANSP: random locks on every trig of every track." : ""; break;
-				case md::PanelControl::BankC: hint = mm ? "Z-hold BANK then SWING: random machine and parameters on every track." : ""; break;
-				case md::PanelControl::BankD: hint = mm ? "Z-hold BANK then SLIDE: random machines, trigs and locks on every track." : ""; break;
+				case md::PanelControl::BankA: hint = mm ? "Hold A (BANK) then ARP: random trigs on every track." : ""; break;
+				case md::PanelControl::BankB: hint = mm ? "Hold A (BANK) then TRANSP: random locks on every trig of every track." : ""; break;
+				case md::PanelControl::BankC: hint = mm ? "Hold A (BANK) then SWING: random machine and parameters on every track." : ""; break;
+				case md::PanelControl::BankD: hint = mm ? "Hold A (BANK) then SLIDE: random machines, trigs and locks on every track." : ""; break;
 				default:
 					if(isTrigger(pb.control) && !mm)
-						hint = "Z-hold BANK GROUP then this trig: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.";
+						hint = "Hold A (BANK GROUP) then this trig: random machine and parameters on that track. Add Shift (FUNCTION) as well for random trigs and locks on it too.";
 					else if(pb.control >= md::PanelControl::Track1 && pb.control <= md::PanelControl::Track6 && mm)
-						hint = "Z-hold BANK then this track key: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.";
+						hint = "Hold A (BANK) then this track key: random machine and parameters on that track. Add Shift (FUNCTION) as well for random trigs and locks on it too.";
 					break;
 				}
 				// Only second-key buttons carry hover text; hold-first keys stay silent.
@@ -877,10 +880,10 @@ namespace mdJucePlugin
 		{
 			const std::pair<const char*, const char*> hints[] =
 			{
-				{ "altArp", "Z-hold BANK then ARP: random trigs on every track." },
-				{ "altTransp", "Z-hold BANK then TRANSP: random locks on every trig of every track." },
-				{ "altSwing", "Z-hold BANK then SWING: random machine and parameters on every track." },
-				{ "altSlide", "Z-hold BANK then SLIDE: random machines, trigs and locks on every track." },
+				{ "altArp", "Hold A (BANK) then ARP: random trigs on every track." },
+				{ "altTransp", "Hold A (BANK) then TRANSP: random locks on every trig of every track." },
+				{ "altSwing", "Hold A (BANK) then SWING: random machine and parameters on every track." },
+				{ "altSlide", "Hold A (BANK) then SLIDE: random machines, trigs and locks on every track." },
 			};
 			for(const auto& [id, hint] : hints)
 				if(auto* const element = findChild(id, false))
@@ -895,7 +898,7 @@ namespace mdJucePlugin
 				const auto id = std::to_string(track);
 				for(const auto& prefix : { panelAffordances::g_drumLedPrefix, panelAffordances::g_trackLabelPrefix })
 					if(auto* const element = findChild((prefix + id).c_str(), false))
-						element->SetAttribute("combo", "Z-hold BANK then this track key: random machine and parameters on that track. Add Shift (FUNCTION) for random trigs and locks on it too.");
+						element->SetAttribute("combo", "Hold A (BANK) then this track key: random machine and parameters on that track. Add Shift (FUNCTION) as well for random trigs and locks on it too.");
 			}
 		}
 
@@ -1358,29 +1361,37 @@ namespace mdJucePlugin
 	void Editor::serviceShiftFunction()
 	{
 		auto* const component = getRmlComponent();
-		const bool wanted = component != nullptr
-			&& (component->isMouseOver(true) || component->hasKeyboardFocus(true))
-			&& juce::ModifierKeys::getCurrentModifiersRealtime().isShiftDown();
-		if(wanted == m_shiftFunctionHeld)
-			return;
-		const auto packet = md::panelPacket(getModel(), md::PanelControl::Function);
-		if(!packet)
-			return;
-		m_shiftFunctionHeld = wanted;
-		const auto combined = wanted ? m_panelRows.press(*packet) : m_panelRows.release(*packet);
-		(void)sendPanelEvent(combined.row, combined.mask);
-		for(const auto& panelButton : g_panelButtons)
+		const bool focused = component != nullptr
+			&& (component->isMouseOver(true) || component->hasKeyboardFocus(true));
+		const auto modifiers = juce::ModifierKeys::getCurrentModifiersRealtime();
+		const auto service = [this](const md::PanelControl _control, const bool _wanted, bool& _held)
 		{
-			if(panelButton.control != md::PanelControl::Function)
-				continue;
-			if(auto* const button = findChild<juceRmlUi::ElemButton>(panelButton.id, false))
-				juceRmlUi::ElemButton::setChecked(button, wanted);
-		}
+			if(_wanted == _held)
+				return;
+			const auto packet = md::panelPacket(getModel(), _control);
+			if(!packet)
+				return;
+			_held = _wanted;
+			const auto combined = _wanted ? m_panelRows.press(*packet) : m_panelRows.release(*packet);
+			(void)sendPanelEvent(combined.row, combined.mask);
+			for(const auto& panelButton : g_panelButtons)
+			{
+				if(panelButton.control != _control)
+					continue;
+				if(auto* const button = findChild<juceRmlUi::ElemButton>(panelButton.id, false))
+					juceRmlUi::ElemButton::setChecked(button, _wanted);
+			}
+		};
+		service(md::PanelControl::Function, focused && modifiers.isShiftDown(), m_shiftFunctionHeld);
+		service(md::PanelControl::BankGroup, focused
+			&& (juce::KeyPress::isKeyCurrentlyDown('A') || juce::KeyPress::isKeyCurrentlyDown('a')), m_aBankHeld);
 	}
 
 	bool Editor::isPanelControlHeld(const md::PanelControl _control) const
 	{
 		if(_control == md::PanelControl::Function && m_shiftFunctionHeld)
+			return true;
+		if(_control == md::PanelControl::BankGroup && m_aBankHeld)
 			return true;
 		if(m_shiftPanelLatch.contains(_control))
 			return true;

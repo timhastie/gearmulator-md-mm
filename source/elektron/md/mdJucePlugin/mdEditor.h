@@ -167,8 +167,9 @@ namespace mdJucePlugin
 		// Keyboard modifiers: Shift presses and holds FUNCTION for as long as it is
 		// down; Z is the hold key for any other panel button (Z-click latches it).
 		static bool holdKeyDown();
-		void serviceShiftFunction();
+		void serviceShiftFunction();	// Shift holds FUNCTION, A holds BANK (BANK GROUP on the MD)
 		bool m_shiftFunctionHeld = false;
+		bool m_aBankHeld = false;
 		double m_holdKeyUpSinceMilliseconds = 0.0;
 		// Hover tooltips for elements carrying a "title" attribute (RmlUi does not
 		// render them itself). Shown after a short delay next to the element.
