@@ -580,8 +580,7 @@ namespace mdJucePlugin
 				switch(pb.control)
 				{
 				case md::PanelControl::Up:
-					hint = mm ? "Shift+UP: random locks on every page, selected track. Z-hold YES then UP: randomize page values. Z-hold UP then click an encoder: random locks on that parameter."
-						: "Shift+UP: random locks, current page, selected track. Z-hold YES then UP: randomize page values. Z-hold UP then click an encoder: random locks on that parameter.";
+					hint = "Shift+UP: random locks on every page, selected track. Z-hold YES then UP: randomize page values. Z-hold UP then click an encoder: random locks on that parameter.";
 					break;
 				case md::PanelControl::Down:
 					hint = "Shift+DOWN: random trigs on the selected track.";
@@ -1619,8 +1618,8 @@ namespace mdJucePlugin
 		uint8_t page = 0;
 		if(_kind == RandomizeKind::QuantizeLocks && m_scale == 0)
 			return showRandomizeMessage("Choose a scale first: press Escape over the panel and set Scale Quantizer > Scale.");
-		const bool mmAllPages = getModel() == md::MachineModel::Monomachine && _kind == RandomizeKind::PageLocks;
-		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks && !wholePattern && !mmAllPages)
+		const bool allPages = _kind == RandomizeKind::PageLocks;
+		if(_kind != RandomizeKind::Trigs && _kind != RandomizeKind::QuantizeLocks && !wholePattern && !allPages)
 		{
 			const auto active = activeMachinedrumPage();
 			if(!active)
@@ -1762,22 +1761,39 @@ namespace mdJucePlugin
 			const auto trigs = pattern->trigs[track] & stepMask;
 			if(trigs == 0)
 				return showRandomizeMessage("The selected track has no trigs to lock.");
-			const uint8_t first = pending.kind == RandomizeKind::ParamLocks
-				? static_cast<uint8_t>(pending.page * 8 + pending.param)
-				: static_cast<uint8_t>(pending.page * 8);
-			const uint8_t count = pending.kind == RandomizeKind::ParamLocks ? 1 : 8;
-			for(uint8_t param = first; param < first + count; ++param)
+			// PageLocks on the MD covers every page (24 parameters); existing locks on
+			// the track are replaced so the row budget is what remains after the
+			// other tracks. ParamLocks targets the single chosen parameter.
+			std::vector<uint8_t> params;
+			if(pending.kind == RandomizeKind::ParamLocks)
+				params.push_back(static_cast<uint8_t>(pending.page * 8 + pending.param));
+			else
+			{
+				for(uint8_t p = md::patternDump::g_classicParams; p-- > 0;)
+				{
+					if(!pattern->hasLock(track, p))
+						continue;
+					pattern->rows.erase(pattern->rows.begin() + static_cast<std::ptrdiff_t>(pattern->rowIndex(track, p)));
+					pattern->lockMasks[track] &= ~(1ull << p);
+				}
+				for(uint8_t p = 0; p < md::patternDump::g_classicParams; ++p)
+					if(!parameterProtectedFromLocks(track, static_cast<uint8_t>(p / 8), static_cast<uint8_t>(p % 8)) && rollParameter())
+						params.push_back(p);
+				std::shuffle(params.begin(), params.end(), m_random);
+				const size_t budget = md::patternDump::g_maxRows - std::min(pattern->rows.size(), md::patternDump::g_maxRows);
+				if(params.size() > budget)
+					params.resize(budget);
+			}
+			for(const auto param : params)
 			{
 				if(parameterProtectedFromLocks(track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8)))
-					continue;
-				if(count > 1 && !rollParameter())
 					continue;
 				for(size_t step = 0; step < steps; ++step)
 				{
 					if(!(trigs >> step & 1u) || !rollLock())
 						continue;
 					if(!pattern->setLock(track, param, static_cast<uint8_t>(step),
-						randomParameterValue(track, pending.page, static_cast<uint8_t>(param - pending.page * 8))))
+						randomParameterValue(track, static_cast<uint8_t>(param / 8), static_cast<uint8_t>(param % 8))))
 						return showRandomizeMessage("This pattern already uses the maximum of 64 parameter-lock rows.");
 				}
 			}

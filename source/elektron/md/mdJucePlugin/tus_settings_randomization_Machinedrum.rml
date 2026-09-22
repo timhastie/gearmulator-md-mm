@@ -17,7 +17,7 @@
 		<settingsspacer1/>
 		<h1>Random Parameter Locks</h1>
 		<settingsspacer1/>
-		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the current page, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
+		<label>Chance that each trig receives a lock on a parameter picked for randomization. Applies to every lock chord: the selected track across all pages, a single parameter, all tracks, and the everything chord. Double-click to reset to 50 %.</label>
 		<settingsspacer1/>
 		<div class="settings-hlayout">
 			<input id="sliderLockChance" class="settings-slider-h" type="range" min="1" max="99" step="1" value="50" style="width: 90%;"/>
